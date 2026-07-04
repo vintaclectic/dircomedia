@@ -24,6 +24,11 @@ it controls.
 7. **LOCAL-FIRST GENERATION** — prefer local models for post drafts where quality allows (Universal Ingestion Law); Claude tiers per frugal-max's standing ruling.
 8. **SECRETS** — `.env` never committed; git repo must have `.gitignore` covering `.env*`, `*.swp`, media dirs BEFORE first commit.
 
+## The book
+**`docs/OWNERS_MANUAL.md`** — the complete operator's guide (setup, tokens,
+account connection + fixes, daily workflow, broadcast.js, safety systems,
+emergency brake, troubleshooting). Read it before touching anything else.
+
 ## To run
 1. `backend/.env` from `.env.example`, fill keys (see `docs/PLATFORM_CONNECTIONS.md`)
 2. `docker-compose up`
