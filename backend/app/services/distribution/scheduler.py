@@ -5,6 +5,9 @@ from app.services.distribution.platforms.twitter import TwitterClient
 from app.services.distribution.platforms.tiktok import TikTokClient
 from app.services.distribution.platforms.instagram import InstagramClient
 from app.services.distribution.platforms.reddit import RedditClient
+from app.services.distribution.platforms.discord import DiscordClient
+from app.services.distribution.platforms.telegram import TelegramClient
+from app.services.distribution.platforms.youtube import YouTubeClient
 from app.core.exceptions import DistributionError
 
 
@@ -14,6 +17,9 @@ class DistributionScheduler:
         self.tiktok = TikTokClient()
         self.instagram = InstagramClient()
         self.reddit = RedditClient()
+        self.discord = DiscordClient()
+        self.telegram = TelegramClient()
+        self.youtube = YouTubeClient()
 
     async def post(
         self,
@@ -37,6 +43,19 @@ class DistributionScheduler:
                 elif platform == "reddit":
                     results["reddit"] = await self._post_reddit(
                         body, media_url, project_slug, subreddits or []
+                    )
+                elif platform == "discord":
+                    results["discord"] = await self.discord.post_message(
+                        body, media_url=media_url, project_slug=project_slug
+                    )
+                elif platform == "telegram":
+                    results["telegram"] = await self.telegram.post_message(body, media_url=media_url)
+                elif platform == "youtube":
+                    if not media_url or content_type not in ("video", "reel"):
+                        raise DistributionError("YouTube requires a video", "youtube")
+                    title, _, rest = body.partition("\n\n")
+                    results["youtube"] = await self.youtube.upload_video(
+                        video_url=media_url, title=title or body[:100], description=rest or body
                     )
             except Exception as e:
                 results[platform] = {"error": str(e), "status": "failed"}

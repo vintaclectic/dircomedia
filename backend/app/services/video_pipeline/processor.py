@@ -75,8 +75,13 @@ class VideoProcessor:
         brand = load_brand_voice(project_slug)
         slug_key = project_slug.replace("-", "_")
 
-        # Upload raw file to R2 or use local URL
-        raw_url = f"file://{file_path}"  # In production: upload to R2 first
+        # Phase 2: upload raw file to R2 — platforms need a publicly fetchable
+        # URL; the old file:// placeholder could never render.
+        from app.services.storage.r2 import upload_file, r2_configured
+        if r2_configured():
+            raw_url = await upload_file(file_path, key_prefix=f"recordings/{slug_key}")
+        else:
+            raw_url = f"file://{file_path}"  # dev fallback — configure R2 for real posting
 
         overlay_config = {
             "template_id": _get_template(RECORDING_TEMPLATES, slug_key),

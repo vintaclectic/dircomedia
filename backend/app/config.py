@@ -42,6 +42,17 @@ class Settings(BaseSettings):
     reddit_username: str = ""
     reddit_password: str = ""
 
+    # Phase 2 platforms (council decree 2026-07-04)
+    youtube_client_id: str = ""
+    youtube_client_secret: str = ""
+    youtube_refresh_token: str = ""
+
+    discord_webhook_url: str = ""
+    discord_webhook_overrides: dict = {}   # {"project_slug": "webhook_url"}
+
+    telegram_bot_token: str = ""
+    telegram_channel_id: str = ""          # @channelname or -100... chat id
+
     # Storage
     r2_account_id: str = ""
     r2_access_key_id: str = ""

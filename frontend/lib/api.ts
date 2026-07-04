@@ -113,6 +113,11 @@ export const approveBroadcast = (id: string) =>
 export const vetoBroadcast = (id: string) =>
   request<Broadcast>(`/api/v1/broadcast/${id}/veto`, { method: "POST" });
 
+// Connection health (Phase 2 — the rail)
+export type PlatformHealth = { configured: boolean | null; live: boolean | null; error?: string };
+export const getConnectionHealth = () =>
+  request<Record<string, PlatformHealth>>("/api/v1/distribution/health");
+
 // Analytics
 export const getProjectSummary = (slug: string) =>
   request<AnalyticsSummary>(`/api/v1/analytics/summary/${slug}`);

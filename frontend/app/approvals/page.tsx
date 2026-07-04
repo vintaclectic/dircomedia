@@ -13,6 +13,8 @@ import {
   listBroadcasts,
   approveBroadcast,
   vetoBroadcast,
+  getConnectionHealth,
+  type PlatformHealth,
 } from "@/lib/api";
 import type { Broadcast, BroadcastStatus } from "@/lib/types";
 
@@ -59,6 +61,7 @@ function timeAgo(iso: string): string {
 export default function ApprovalsPage() {
   const [pending, setPending] = useState<Broadcast[]>([]);
   const [recent, setRecent] = useState<Broadcast[]>([]);
+  const [health, setHealth] = useState<Record<string, PlatformHealth> | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null); // 2-tap state
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +80,13 @@ export default function ApprovalsPage() {
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 15000);
-    return () => clearInterval(t);
+    // Health probes are heavier (live API calls) — poll on a slower cadence.
+    getConnectionHealth().then(setHealth).catch(() => setHealth(null));
+    const h = setInterval(
+      () => getConnectionHealth().then(setHealth).catch(() => setHealth(null)),
+      120000,
+    );
+    return () => { clearInterval(t); clearInterval(h); };
   }, [refresh]);
 
   const act = async (id: string, action: "approve" | "veto") => {
@@ -111,9 +120,30 @@ export default function ApprovalsPage() {
           </span>
         )}
       </div>
-      <p style={{ color: "#56565f", fontSize: 13, marginTop: 2, marginBottom: 26 }}>
+      <p style={{ color: "#56565f", fontSize: 13, marginTop: 2, marginBottom: 18 }}>
         Nothing posts without your word. Two taps to release, one to kill.
       </p>
+
+      {/* Connection rail — an account never rots silently (Cable Guy Law) */}
+      {health && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
+          {Object.entries(health).map(([name, h]) => {
+            const dot = h.live === true ? "#00DD88" : h.live === false ? "#FF2222" : h.configured ? "#FFD700" : "#36363f";
+            const label = h.live === true ? "live" : h.live === false ? "DOWN" : h.configured ? "set" : "off";
+            return (
+              <span key={name} title={`${name}: ${label}`} style={{
+                ...mono, fontSize: 8.5, color: h.configured ? "#8a8a98" : "#36363f",
+                display: "inline-flex", alignItems: "center", gap: 6,
+                border: `1px solid ${h.live === false ? "rgba(255,34,34,0.4)" : "rgba(255,255,255,0.08)"}`,
+                borderRadius: 20, padding: "4px 10px",
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot, boxShadow: h.live ? `0 0 6px ${dot}` : "none" }} />
+                {name} · {label}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {error && (
         <div style={{

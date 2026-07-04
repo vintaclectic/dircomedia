@@ -29,8 +29,8 @@ from app.workers.broadcast_tasks import broadcast_fanout_task
 
 router = APIRouter()
 
-TEXT_CAPABLE = ["twitter", "reddit"]
-MEDIA_CAPABLE = ["twitter", "reddit", "instagram", "tiktok"]
+TEXT_CAPABLE = ["twitter", "reddit", "discord", "telegram"]
+MEDIA_CAPABLE = ["twitter", "reddit", "discord", "telegram", "instagram", "tiktok", "youtube"]
 FANNED_OUT = [BroadcastStatus.posting, BroadcastStatus.posted, BroadcastStatus.partial]
 
 
@@ -70,7 +70,12 @@ class BroadcastOut(BaseModel):
 
 def _resolve_platforms(req: BroadcastIn) -> list[str]:
     if not req.platforms or req.platforms == ["all"]:
-        return MEDIA_CAPABLE if req.media_url else TEXT_CAPABLE
+        if req.media_url and req.content_type in ("video", "reel"):
+            return MEDIA_CAPABLE
+        if req.media_url:
+            # image: everything except the video-only platforms
+            return [p for p in MEDIA_CAPABLE if p not in ("tiktok", "youtube")]
+        return TEXT_CAPABLE
     return [p for p in req.platforms if p in MEDIA_CAPABLE]
 
 
