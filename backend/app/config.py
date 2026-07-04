@@ -53,6 +53,21 @@ class Settings(BaseSettings):
     brand_configs_dir: str = "/app/brand_configs"
     media_upload_dir: str = "/tmp/dircomedia/uploads"
 
+    # Security (Phase 0 — council decree 2026-07-04)
+    owner_api_token: str = ""          # required; API fails closed if blank
+    cors_origins: str = "http://localhost:3000,http://172.25.39.140:3000"
+
+    # Broadcast Spine (Phase 1)
+    broadcast_kill_switch: bool = False        # True = nothing posts, period
+    broadcast_daily_cap: int = 10              # max broadcasts fanned out per platform per day
+    broadcast_dedupe_hours: int = 24           # identical content blocked within this window
+    brain_webhook_url: str = ""                # optional: brain endpoint for status callbacks
+    brain_webhook_token: str = ""              # token sent to the brain webhook
+
+    # Model tiering (frugal-max ruling: Opus never for post text)
+    content_text_model: str = "claude-sonnet-4-5"
+    video_script_model: str = "claude-sonnet-4-5"
+
     class Config:
         env_file = ".env"
 

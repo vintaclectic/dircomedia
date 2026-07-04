@@ -9,11 +9,16 @@ import type {
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const OWNER_TOKEN = process.env.NEXT_PUBLIC_OWNER_TOKEN || "";
+
+function authHeaders(): Record<string, string> {
+  return OWNER_TOKEN ? { Authorization: `Bearer ${OWNER_TOKEN}` } : {};
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...options?.headers },
   });
   if (!res.ok) {
     const error = await res.text();
@@ -71,6 +76,7 @@ export const uploadRecording = async (
   form.append("platforms", platforms.join(","));
   const res = await fetch(`${BASE}/api/v1/video/process-recording`, {
     method: "POST",
+    headers: authHeaders(),
     body: form,
   });
   if (!res.ok) throw new Error(`Upload failed: ${res.status}`);

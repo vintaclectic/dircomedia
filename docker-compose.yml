@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: dirco
       POSTGRES_DB: dircomedia
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"   # Phase 0: never expose the DB beyond this host
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"   # Phase 0: never expose the broker beyond this host
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -113,6 +113,9 @@ services:
       - backend
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # Owner token for the browser client (owner-only tool; token is embedded
+      # in the bundle by design — set in root ./.env for compose interpolation)
+      - NEXT_PUBLIC_OWNER_TOKEN=${OWNER_API_TOKEN:-}
 
 volumes:
   postgres_data:
