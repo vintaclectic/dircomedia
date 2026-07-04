@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <!-- Per-project glows -->
+    <filter id="glow-blue"   x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-center" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="18" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-soft"   x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+
+    <!-- Outer ring gradient -->
+    <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#0055FF" stop-opacity="0.6"/>
+      <stop offset="16%"  stop-color="#FF2222" stop-opacity="0.6"/>
+      <stop offset="33%"  stop-color="#00DD88" stop-opacity="0.6"/>
+      <stop offset="50%"  stop-color="#FF5500" stop-opacity="0.6"/>
+      <stop offset="66%"  stop-color="#FFD700" stop-opacity="0.6"/>
+      <stop offset="83%"  stop-color="#7C3AED" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#F0287A" stop-opacity="0.6"/>
+    </linearGradient>
+
+    <!-- Center glow fill -->
+    <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#0055FF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#0055FF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- BG -->
+    <radialGradient id="bg-grad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#0d0d1a"/>
+      <stop offset="100%" stop-color="#020205"/>
+    </radialGradient>
+
+    <clipPath id="hex-clip">
+      <!-- Hexagon clip path centered at 200,200 radius 170 -->
+      <polygon points="200,30 347,115 347,285 200,370 53,285 53,115"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="200" cy="200" r="195" fill="url(#bg-grad)"/>
+  <circle cx="200" cy="200" r="195" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+  <!-- ── 7 SEGMENTS — pie slices, each project color ─────────────── -->
+  <!-- Each segment: pie slice from center (200,200), angle spread ~51.4deg each -->
+  <!-- Segment 1: DirCo #0055FF — top, 0° to 51.4° -->
+  <path d="M200,200 L200,42 A158,158 0 0,1 290,64 Z" fill="#0055FF" opacity="0.82" clip-path="url(#hex-clip)"/>
+  <!-- Segment 2: DirHaven RP #FF2222 — 51.4° to 102.8° -->
+  <path d="M200,200 L290,64 A158,158 0 0,1 346,168 Z" fill="#FF2222" opacity="0.82" clip-path="url(#hex-clip)"/>
+  <!-- Segment 3: DirHaven App #00DD88 — 102.8° to 154.2° -->
+  <path d="M200,200 L346,168 A158,158 0 0,1 316,294 Z" fill="#00DD88" opacity="0.82" clip-path="url(#hex-clip)"/>
+  <!-- Segment 4: DirMegle #FF5500 — 154.2° to 205.7° -->
+  <path d="M200,200 L316,294 A158,158 0 0,1 200,358 Z" fill="#FF5500" opacity="0.82" clip-path="url(#hex-clip)"/>
+  <!-- Segment 5: Medaled #FFD700 — 205.7° to 257.1° -->
+  <path d="M200,200 L200,358 A158,158 0 0,1 84,294 Z" fill="#FFD700" opacity="0.82" clip-path="url(#hex-clip)"/>
+  <!-- Segment 6: Agentis #7C3AED — 257.1° to 308.5° -->
+  <path d="M200,200 L84,294 A158,158 0 0,1 54,168 Z" fill="#7C3AED" opacity="0.82" clip-path="url(#hex-clip)"/>
+  <!-- Segment 7: Vintinuum #F0287A — 308.5° to 360° -->
+  <path d="M200,200 L54,168 A158,158 0 0,1 200,42 Z" fill="#F0287A" opacity="0.82" clip-path="url(#hex-clip)"/>
+
+  <!-- Segment divider lines — thin, dark -->
+  <line x1="200" y1="200" x2="200" y2="42"   stroke="rgba(0,0,0,0.5)" stroke-width="1.5"/>
+  <line x1="200" y1="200" x2="290" y2="64"   stroke="rgba(0,0,0,0.5)" stroke-width="1.5"/>
+  <line x1="200" y1="200" x2="346" y2="168"  stroke="rgba(0,0,0,0.5)" stroke-width="1.5"/>
+  <line x1="200" y1="200" x2="316" y2="294"  stroke="rgba(0,0,0,0.5)" stroke-width="1.5"/>
+  <line x1="200" y1="200" x2="200" y2="358"  stroke="rgba(0,0,0,0.5)" stroke-width="1.5"/>
+  <line x1="200" y1="200" x2="84"  y2="294"  stroke="rgba(0,0,0,0.5)" stroke-width="1.5"/>
+  <line x1="200" y1="200" x2="54"  y2="168"  stroke="rgba(0,0,0,0.5)" stroke-width="1.5"/>
+
+  <!-- Hexagon border -->
+  <polygon points="200,30 347,115 347,285 200,370 53,285 53,115" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+
+  <!-- Outer orbit ring -->
+  <circle cx="200" cy="200" r="175" fill="none" stroke="url(#ring-grad)" stroke-width="1" opacity="0.7"/>
+
+  <!-- Orbit dots — one per project at each segment midpoint -->
+  <circle cx="200" cy="26"  r="3.5" fill="#0055FF" filter="url(#glow-soft)"/>
+  <circle cx="326" cy="88"  r="3.5" fill="#FF2222" filter="url(#glow-soft)"/>
+  <circle cx="348" cy="238" r="3.5" fill="#00DD88" filter="url(#glow-soft)"/>
+  <circle cx="271" cy="347" r="3.5" fill="#FF5500" filter="url(#glow-soft)"/>
+  <circle cx="129" cy="347" r="3.5" fill="#FFD700" filter="url(#glow-soft)"/>
+  <circle cx="52"  cy="238" r="3.5" fill="#7C3AED" filter="url(#glow-soft)"/>
+  <circle cx="74"  cy="88"  r="3.5" fill="#F0287A" filter="url(#glow-soft)"/>
+
+  <!-- Center dark circle — the eye -->
+  <circle cx="200" cy="200" r="62" fill="#020205"/>
+  <circle cx="200" cy="200" r="62" fill="url(#center-glow)"/>
+  <circle cx="200" cy="200" r="62" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+
+  <!-- Center glow bloom -->
+  <circle cx="200" cy="200" r="40" fill="#0055FF" opacity="0.08" filter="url(#glow-center)"/>
+
+  <!-- DC monogram — Bebas Neue style, manual paths for portability -->
+  <text
+    x="200" y="214"
+    font-family="'Bebas Neue', 'Arial Narrow', Arial, sans-serif"
+    font-size="42"
+    font-weight="400"
+    fill="#f5f5f7"
+    text-anchor="middle"
+    letter-spacing="4"
+    filter="url(#glow-soft)"
+  >DC</text>
+
+  <!-- Tiny orbit label ring — project initials at each dot -->
+  <text x="200" y="12"  font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#0055FF" text-anchor="middle" letter-spacing="0.5" opacity="0.9">DIRCO</text>
+  <text x="338" y="78"  font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#FF2222" text-anchor="middle" letter-spacing="0.5" opacity="0.9" transform="rotate(51,338,78)">RP</text>
+  <text x="360" y="248" font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#00DD88" text-anchor="start"  letter-spacing="0.5" opacity="0.9" transform="rotate(103,360,248)">APP</text>
+  <text x="274" y="364" font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#FF5500" text-anchor="middle" letter-spacing="0.5" opacity="0.9" transform="rotate(154,274,364)">MEGLE</text>
+  <text x="126" y="364" font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#FFD700" text-anchor="middle" letter-spacing="0.5" opacity="0.9" transform="rotate(206,126,364)">MEDALED</text>
+  <text x="38"  y="248" font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#7C3AED" text-anchor="end"    letter-spacing="0.5" opacity="0.9" transform="rotate(257,38,248)">AGENTIS</text>
+  <text x="62"  y="78"  font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#F0287A" text-anchor="middle" letter-spacing="0.5" opacity="0.9" transform="rotate(309,62,78)">VINT</text>
+</svg>

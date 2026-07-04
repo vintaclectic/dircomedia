@@ -1,0 +1,41 @@
+# SECRETS — never, ever committed
+.env
+.env.*
+*.env
+!.env.example
+!**/.env.example
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+npm-debug.log*
+
+# Media / uploads
+uploads/
+media/
+*.mp4
+*.mov
+
+# DB / local state
+*.db
+*.sqlite
+postgres_data/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
