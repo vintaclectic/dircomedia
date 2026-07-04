@@ -85,11 +85,11 @@ Existing build scored **72/100** — strong cinematic base (Buffet linework, par
 
 ## VII. THE PHASED BUILD ORDER (sovereign's arbitration)
 
-**PHASE 0 — LOCKDOWN (serial, first, ~1 session)**
-.env.swp inspect→delete→rotate · git init + .gitignore · owner HMAC auth on all mutating endpoints · CORS lock · Reddit password → token flow
+**PHASE 0 — LOCKDOWN — ✅ EXECUTED 2026-07-04 (commits 375e40c on baseline 4537eaa)**
+✅ .env.swp inspected (benign) + deleted · ✅ git init + .gitignore (secrets never tracked) · ✅ owner token auth on ALL routes, fail-closed, constant-time · ✅ settings write endpoint sealed behind owner auth · ✅ postgres+redis bound 127.0.0.1 · ✅ backend/.env chmod 600 · ✅ OWNER_API_TOKEN generated (backend/.env + root .env for compose) · ⏳ Reddit password → token flow (deferred: needs Vinta account action, see PLATFORM_CONNECTIONS.md §2)
 
-**PHASE 1 — THE SPINE (the reason for the reforging)**
-`POST /api/v1/broadcast` + fan-out · `broadcast.js` in vintinuum-api · approve-first queue + status webhooks · Work Journal `broadcastable` tap · fix project_slug bug · model-tier switch per frugal ruling · frontend approval surface (bottom-sheet, 2-tap) · Mission Control v1
+**PHASE 1 — THE SPINE — ✅ EXECUTED 2026-07-04 (commit 3f726d8 + vintinuum-api b758f45 + frontend commit)**
+✅ `POST /api/v1/broadcast` submit/approve/veto/pending w/ idempotency, dedupe (409), kill switch (423), daily cap (429) · ✅ fan-out worker on distribution queue w/ per-platform results + brain status webhook (fires when BRAIN_WEBHOOK_URL set; brain-side receiver = Phase 2) · ✅ `broadcast.js` in vintinuum-api (spool-first, --drain, --tap for Work Journal BROADCAST: notes, --pending) · ✅ project_slug bug fixed · ✅ model tiering env-driven (Opus removed from post text) · ✅ frontend /approvals: 2-tap approve, 1-tap veto, 15s poll, recent-broadcast strip (archive wall seed) · ⏳ Mission Control full god-view = Phase 2 (helios-10 spec ready)
 
 **PHASE 2 — REACH + FLESH**
 `platforms/youtube.py` (Data API v3, resumable upload) · R2 media upload (unblocks IG/TikTok video) · Creatomate templates · Discord + Telegram clients (highest value-per-effort) · connection-health rail + expiry alerting · ARIA YAML v2 rollout + Persistence Engine scheduler entries · Lunex genome tokens into globals.css

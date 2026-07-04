@@ -6,6 +6,7 @@ import type {
   StrategyInsight,
   GenerateRequest,
   VideoJobOut,
+  Broadcast,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -98,6 +99,19 @@ export const schedulePost = (contentId: string, scheduledAt: string, platforms?:
 
 export const listSchedules = (upcomingOnly = true) =>
   request<Schedule[]>(`/api/v1/distribution/schedules?upcoming_only=${upcomingOnly}`);
+
+// Broadcast Spine (approve-first loop — council decree 2026-07-04)
+export const listPendingBroadcasts = () =>
+  request<Broadcast[]>("/api/v1/broadcast/pending");
+
+export const listBroadcasts = (limit = 50) =>
+  request<Broadcast[]>(`/api/v1/broadcast/?limit=${limit}`);
+
+export const approveBroadcast = (id: string) =>
+  request<Broadcast>(`/api/v1/broadcast/${id}/approve`, { method: "POST" });
+
+export const vetoBroadcast = (id: string) =>
+  request<Broadcast>(`/api/v1/broadcast/${id}/veto`, { method: "POST" });
 
 // Analytics
 export const getProjectSummary = (slug: string) =>

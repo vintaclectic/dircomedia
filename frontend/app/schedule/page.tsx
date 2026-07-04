@@ -9,7 +9,7 @@ const mono9: React.CSSProperties = { fontFamily: "var(--font-mono), monospace", 
 
 function Row({ s }: { s: Schedule }) {
   const past = isPast(new Date(s.scheduled_at));
-  const accent = s.posted ? "#00DD88" : past ? "#FF3B47" : "#3D8BFF";
+  const accent = s.is_posted ? "#00DD88" : past ? "#FF3B47" : "#3D8BFF";
   return (
     <div style={{
       background: "#0b0b14", border: "1px solid rgba(255,255,255,0.08)",
@@ -28,7 +28,7 @@ function Row({ s }: { s: Schedule }) {
         <div style={{ fontSize: 13, fontWeight: 600, color: "#f5f5f7", marginBottom: 3, letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {s.content_id}
         </div>
-        <div style={{ ...mono9 }}>{format(new Date(s.scheduled_at), "HH:mm")} · {s.platform}</div>
+        <div style={{ ...mono9 }}>{format(new Date(s.scheduled_at), "HH:mm")} · {s.platforms.join(", ")}</div>
       </div>
       <div style={{
         display: "inline-flex", alignItems: "center", gap: 6,
@@ -36,18 +36,19 @@ function Row({ s }: { s: Schedule }) {
         background: `${accent}18`, border: `1px solid ${accent}44`,
       }}>
         <div style={{ width: 5, height: 5, borderRadius: "50%", background: accent, boxShadow: `0 0 5px ${accent}` }} />
-        <span style={{ ...mono9, color: accent }}>{s.posted ? "Posted" : past ? "Missed" : "Upcoming"}</span>
+        <span style={{ ...mono9, color: accent }}>{s.is_posted ? "Posted" : past ? "Missed" : "Upcoming"}</span>
       </div>
     </div>
   );
 }
 
 export default function SchedulePage() {
-  const { data: all } = useSWR("schedules-all", () => listSchedules());
-  const { data: posted } = useSWR("schedules-posted", () => listSchedules(true));
+  // upcoming_only=false → everything; derive the three buckets locally.
+  const { data: all } = useSWR("schedules-all", () => listSchedules(false));
 
-  const upcoming = all?.filter(s => !s.posted && !isPast(new Date(s.scheduled_at))) ?? [];
-  const missed   = all?.filter(s => !s.posted && isPast(new Date(s.scheduled_at))) ?? [];
+  const posted   = all?.filter(s => s.is_posted) ?? [];
+  const upcoming = all?.filter(s => !s.is_posted && !isPast(new Date(s.scheduled_at))) ?? [];
+  const missed   = all?.filter(s => !s.is_posted && isPast(new Date(s.scheduled_at))) ?? [];
 
   return (
     <div style={{ minHeight: "100vh" }}>

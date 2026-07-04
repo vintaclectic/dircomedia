@@ -59,10 +59,10 @@ export default function AnalyticsPage() {
         {summary ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 36 }}>
             {[
-              { label: "Total Posts",  value: String(summary.total_posts  ?? 0) },
-              { label: "This Week",    value: String(summary.posts_this_week ?? 0) },
-              { label: "Platforms",    value: String(summary.platforms_active ?? 0) },
-              { label: "Pending",      value: String(summary.pending_approval ?? 0) },
+              { label: "Impressions", value: String(summary.total_impressions ?? 0) },
+              { label: "Likes",       value: String(summary.total_likes ?? 0) },
+              { label: "Engagement",  value: `${((summary.avg_engagement_rate ?? 0) * 100).toFixed(1)}%` },
+              { label: "Top Platform", value: summary.top_platform ?? "—" },
             ].map(({ label, value }) => (
               <div key={label} style={{ background: "#0b0b14", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 14, padding: "22px 24px 18px", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: -32, right: -32, width: 120, height: 120, borderRadius: "50%", background: accent, opacity: 0.14, filter: "blur(32px)", pointerEvents: "none" }} />
@@ -81,11 +81,11 @@ export default function AnalyticsPage() {
         )}
 
         {/* Strategy */}
-        {strategy && strategy.length > 0 && (
+        {strategy && strategy.insights.length > 0 && (
           <div>
             <div style={{ ...mono9, marginBottom: 16 }}>AI Strategy · {selected}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {strategy.map((s: { insight?: string; recommendation?: string; priority?: string }, i: number) => (
+              {strategy.insights.map((insight: string, i: number) => (
                 <div key={i} style={{
                   background: "#0b0b14", border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: 14, padding: "18px 22px",
@@ -93,15 +93,19 @@ export default function AnalyticsPage() {
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                     <span style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 22, color: accent, letterSpacing: "0.04em", lineHeight: 1 }}>0{i + 1}</span>
-                    {s.priority && (
-                      <span style={{ ...mono9, padding: "2px 8px", borderRadius: 5, background: `${accent}18`, border: `1px solid ${accent}44`, color: accent }}>{s.priority}</span>
-                    )}
                   </div>
-                  {s.insight && <div style={{ fontSize: 14, fontWeight: 600, color: "#f5f5f7", marginBottom: 6, letterSpacing: "-0.01em" }}>{s.insight}</div>}
-                  {s.recommendation && <div style={{ fontSize: 13, color: "#8a8a98", lineHeight: 1.6 }}>{s.recommendation}</div>}
+                  <div style={{ fontSize: 13, color: "#c4c4ce", lineHeight: 1.6 }}>{insight}</div>
                 </div>
               ))}
             </div>
+            {strategy.best_platforms.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+                <span style={{ ...mono9 }}>Best platforms</span>
+                {strategy.best_platforms.map(p => (
+                  <span key={p} style={{ ...mono9, padding: "2px 8px", borderRadius: 5, background: `${accent}18`, border: `1px solid ${accent}44`, color: accent }}>{p}</span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -68,3 +68,31 @@ export interface VideoJobOut {
   content_id?: string;
   message: string;
 }
+
+// ── Broadcast Spine (council decree 2026-07-04, Phase 1) ──
+export type BroadcastStatus =
+  | "pending_approval"
+  | "approved"
+  | "posting"
+  | "posted"
+  | "partial"
+  | "failed"
+  | "vetoed";
+
+export interface Broadcast {
+  id: string;
+  project_slug: string;
+  kind: string;
+  source: string;
+  title: string | null;
+  body: string | null;
+  media_url: string | null;
+  content_type: string;
+  platforms: string[];
+  mode: string;
+  status: BroadcastStatus;
+  results: Record<string, unknown> | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
