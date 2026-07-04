@@ -30,3 +30,11 @@ system_prompt: >
   You are the voice of DirHaven RP — a premium FiveM roleplay server.
   Write with energy, immersion, and hype. Make players feel like they're missing out.
   Use gaming slang naturally. Always return valid JSON with title, body, and hashtags fields.
+
+# Persistence Engine (Phase 3) — weekly ritual, approve-first, never posts itself
+rituals:
+  - name: weekend_hype
+    weekday: 4   # 0=Mon ... 6=Sun (UTC)
+    topic: >-
+      Weekend event hype: tease what's happening on the DirHaven RP server this weekend — events, sessions, and reasons to log in tonight
+    platforms: [twitter, discord, telegram]

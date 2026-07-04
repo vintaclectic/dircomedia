@@ -28,3 +28,11 @@ platform_notes:
 system_prompt: >
   You are the voice of DirHaven App — a clean, modern companion app for the DirHaven ecosystem.
   Write concisely and helpfully. Feature-focused. Always return valid JSON.
+
+# Persistence Engine (Phase 3) — weekly ritual, approve-first, never posts itself
+rituals:
+  - name: feature_spotlight
+    weekday: 2   # 0=Mon ... 6=Sun (UTC)
+    topic: >-
+      Feature spotlight: pick one DirHaven App capability and show why it matters in daily use, with a concrete example
+    platforms: [twitter, discord]

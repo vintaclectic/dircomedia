@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 from app.config import settings
 
 celery_app = Celery(
@@ -10,6 +11,8 @@ celery_app = Celery(
         "app.workers.video_tasks",
         "app.workers.distribution_tasks",
         "app.workers.broadcast_tasks",
+        "app.workers.guardian_tasks",
+        "app.workers.persistence_tasks",
     ],
 )
 
@@ -26,6 +29,8 @@ celery_app.conf.update(
         "app.workers.video_tasks.*": {"queue": "video"},
         "app.workers.distribution_tasks.*": {"queue": "distribution"},
         "app.workers.broadcast_tasks.*": {"queue": "distribution"},
+        "app.workers.guardian_tasks.*": {"queue": "distribution"},
+        "app.workers.persistence_tasks.*": {"queue": "content"},
         "app.workers.content_tasks.*": {"queue": "content"},
     },
     beat_schedule={
@@ -36,6 +41,19 @@ celery_app.conf.update(
         "process-scheduled-posts": {
             "task": "app.workers.distribution_tasks.process_due_schedules",
             "schedule": 60.0,
+        },
+        # ── Phase 3 guardians (council decree 2026-07-04) ──
+        "guardian-health-watch": {
+            "task": "app.workers.guardian_tasks.platform_health_check",
+            "schedule": crontab(minute=0, hour="*/6"),  # every 6h
+        },
+        "guardian-instagram-token-refresh": {
+            "task": "app.workers.guardian_tasks.refresh_instagram_token",
+            "schedule": crontab(minute=0, hour=8, day_of_week=1),  # Mondays 08:00 UTC
+        },
+        "persistence-engine-daily": {
+            "task": "app.workers.persistence_tasks.run_persistence_engine",
+            "schedule": crontab(minute=0, hour=14),  # daily 14:00 UTC
         },
     },
 )

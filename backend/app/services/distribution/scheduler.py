@@ -8,6 +8,7 @@ from app.services.distribution.platforms.reddit import RedditClient
 from app.services.distribution.platforms.discord import DiscordClient
 from app.services.distribution.platforms.telegram import TelegramClient
 from app.services.distribution.platforms.youtube import YouTubeClient
+from app.services.distribution.platforms.bluesky import BlueskyClient
 from app.core.exceptions import DistributionError
 
 
@@ -20,6 +21,7 @@ class DistributionScheduler:
         self.discord = DiscordClient()
         self.telegram = TelegramClient()
         self.youtube = YouTubeClient()
+        self.bluesky = BlueskyClient()
 
     async def post(
         self,
@@ -50,6 +52,8 @@ class DistributionScheduler:
                     )
                 elif platform == "telegram":
                     results["telegram"] = await self.telegram.post_message(body, media_url=media_url)
+                elif platform == "bluesky":
+                    results["bluesky"] = await self.bluesky.post_message(body, media_url=media_url)
                 elif platform == "youtube":
                     if not media_url or content_type not in ("video", "reel"):
                         raise DistributionError("YouTube requires a video", "youtube")

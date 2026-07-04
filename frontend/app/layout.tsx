@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
-import { Home, FileText, Video, Calendar, BarChart2, Settings, Radio } from "lucide-react";
+import { Home, FileText, Video, Calendar, BarChart2, Settings, Radio, Archive } from "lucide-react";
 import { Bebas_Neue, Inter, JetBrains_Mono, Instrument_Serif } from "next/font/google";
 
 const bebasNeue = Bebas_Neue({ weight: "400", subsets: ["latin"], variable: "--font-display", display: "swap" });
@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 const NAV = [
   { href: "/",          label: "Dashboard", icon: Home },
   { href: "/approvals", label: "Approvals", icon: Radio },
+  { href: "/archive",   label: "Archive",   icon: Archive },
   { href: "/content",   label: "Content",   icon: FileText },
   { href: "/video",     label: "Video",     icon: Video },
   { href: "/schedule",  label: "Schedule",  icon: Calendar },

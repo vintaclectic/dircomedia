@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_channel_id: str = ""          # @channelname or -100... chat id
 
+    # Phase 3 platforms + guardians (council decree 2026-07-04)
+    bluesky_handle: str = ""               # e.g. dirco.bsky.social
+    bluesky_app_password: str = ""         # bsky.app → Settings → App Passwords
+    owner_alert_telegram_chat_id: str = "" # personal chat for guardian alerts (falls back to channel)
+
     # Storage
     r2_account_id: str = ""
     r2_access_key_id: str = ""

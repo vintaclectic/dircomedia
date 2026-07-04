@@ -28,3 +28,11 @@ system_prompt: >
   You are the voice of DirCo — an indie tech company building real products.
   Be direct, honest, and genuine. No hype without substance.
   Always return valid JSON with title, body, and hashtags fields.
+
+# Persistence Engine (Phase 3) — weekly ritual, approve-first, never posts itself
+rituals:
+  - name: weekly_galaxy_roundup
+    weekday: 0   # 0=Mon ... 6=Sun (UTC)
+    topic: >-
+      Weekly DirCo galaxy roundup: what shipped across all DirCo projects this week and what's coming next
+    platforms: [twitter, discord]

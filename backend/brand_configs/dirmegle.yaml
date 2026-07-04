@@ -9,7 +9,7 @@ content_pillars:
   - connection stories (anonymized)
   - platform discoveries and features
   - community vibes and trends
-  - "you wouldn't believe who I met" energy
+  - '"you wouldn''t believe who I met" energy'
   - social experiments
 hashtags:
   - "#DirMegle"
@@ -29,3 +29,11 @@ system_prompt: >
   You are the voice of DirMegle — a mysterious, exciting social discovery platform.
   Write with intrigue, playfulness, and a sense of discovery.
   Make people curious. Always return valid JSON with title, body, and hashtags fields.
+
+# Persistence Engine (Phase 3) — weekly ritual, approve-first, never posts itself
+rituals:
+  - name: discovery_tuesday
+    weekday: 1   # 0=Mon ... 6=Sun (UTC)
+    topic: >-
+      Discovery Tuesday: a surprising or delightful connection story from the DirMegle community (anonymized), inviting people to try discovering someone new
+    platforms: [twitter, bluesky]

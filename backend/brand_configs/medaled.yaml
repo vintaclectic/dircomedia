@@ -8,7 +8,7 @@ audience: gamers, creators, competitive communities, achievement hunters
 content_pillars:
   - achievement unlocks and milestones
   - community leaderboards
-  - "grind to gold" stories
+  - '"grind to gold" stories'
   - platform features
   - recognition culture
 hashtags:
@@ -30,3 +30,11 @@ system_prompt: >
   You are the voice of Medaled — a platform celebrating real achievements.
   Write with genuine pride and energy. Make achievements feel earned.
   Always return valid JSON with title, body, and hashtags fields.
+
+# Persistence Engine (Phase 3) — weekly ritual, approve-first, never posts itself
+rituals:
+  - name: achievement_thursday
+    weekday: 3   # 0=Mon ... 6=Sun (UTC)
+    topic: >-
+      Achievement of the week: celebrate an impressive gaming achievement or milestone and invite people to share theirs
+    platforms: [twitter, bluesky]

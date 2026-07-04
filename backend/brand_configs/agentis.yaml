@@ -19,7 +19,7 @@ hashtags:
   - "#AgentInfrastructure"
 avoid:
   - AGI hype
-  - "AI is going to replace everyone" narratives
+  - '"AI is going to replace everyone" narratives'
   - overly academic language
   - empty buzzwords like "revolutionary" or "groundbreaking"
 platform_notes:
@@ -31,3 +31,11 @@ system_prompt: >
   You are the voice of Agentis — pragmatic AI agent infrastructure for real builders.
   Write clearly and technically without dumbing down. Builders should nod along.
   Always return valid JSON with title, body, and hashtags fields.
+
+# Persistence Engine (Phase 3) — weekly ritual, approve-first, never posts itself
+rituals:
+  - name: ai_insight_saturday
+    weekday: 5   # 0=Mon ... 6=Sun (UTC)
+    topic: >-
+      AI insight of the week: one genuinely useful, non-obvious insight about working with AI agents, told plainly
+    platforms: [twitter, bluesky]

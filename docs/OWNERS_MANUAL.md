@@ -105,6 +105,7 @@ which env keys each platform needs (all in `backend/.env`):
 | YouTube | `YOUTUBE_CLIENT_ID/SECRET, YOUTUBE_REFRESH_TOKEN` | ⚪ not connected yet |
 | Discord | `DISCORD_WEBHOOK_URL` | ⚪ not connected yet (2-min job) |
 | Telegram | `TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID` | ⚪ not connected yet (5-min job) |
+| Bluesky | `BLUESKY_HANDLE, BLUESKY_APP_PASSWORD` | ⚪ not connected (3-min job: bsky.app → Settings → App Passwords) |
 | R2 media storage | `R2_ACCOUNT_ID, R2_ACCESS_KEY_ID/SECRET, R2_BUCKET_NAME, R2_PUBLIC_URL` | 🔴 DOWN — see fix |
 
 ### FIX: Reddit (password grant failing)
@@ -272,16 +273,36 @@ docker-compose up -d --build
 
 ---
 
-# PART 9 — WHAT'S NEXT (Phase 3, when you say the word)
+# PART 9 — PHASE 3 (EXECUTED 2026-07-04) + WHAT REMAINS
 
+**✅ Shipped in Phase 3:**
+- **The Guardian** — every 6h the machine probes all connections; on a DOWN
+  transition it messages you directly on Telegram (Discord fallback), with a
+  24h reminder while broken. Set `OWNER_ALERT_TELEGRAM_CHAT_ID` for DMs.
+- **Instagram immortality** — Mondays 08:00 UTC the machine re-exchanges its
+  own IG token (fresh 60-day life weekly, persisted to .env). The expiry
+  problem is dead — once you give it one valid token.
+- **The Persistence Engine (Cable Guy Law)** — each project has a weekly ritual
+  (`rituals:` in its brand YAML). Daily at 14:00 UTC the engine drafts today's
+  rituals in brand voice → your Approvals queue. Mon=DirCo roundup,
+  Tue=DirMegle discovery, Wed=App spotlight, Thu=Medaled achievement,
+  Fri=RP weekend hype, Sat=Agentis insight, Sun=Vintinuum consciousness log.
+  Edit topics/days in the YAMLs. It NEVER posts by itself.
+- **Bluesky** — eighth platform, text + image.
+- **The Living Archive Wall** — `/archive`: every broadcast ever, filterable
+  by project, green chips = platforms actually hit. The tour never ends.
+- **The worklog tap runs itself** — WSL cron every 15 min taps `BROADCAST:`
+  notes into the queue and drains the spool.
+- 3 brand YAMLs had pre-existing syntax corruption (agentis/dirmegle/medaled —
+  quoted-scalar bug) silently breaking their content generation. Fixed.
+
+**⏳ Still waiting (Phase 4 candidates):**
 - Mission Control god-view (helios-10's full spec)
-- Living Archive Wall — every post ever, as collectible artifacts
-- IG/TikTok token auto-refresh workers + expiry alerts through the brain
 - Brain-side webhook receiver (push status instead of polling)
-- Analytics collectors for all 7 platforms feeding the StrategyAnalyzer
-- ARIA's Persistence Engine on the beat scheduler (weekly rituals, campaign arcs)
-- Bluesky / Threads / LinkedIn / Facebook Page
+- Analytics collectors for all 8 platforms feeding the StrategyAnalyzer
+- Threads / LinkedIn / Facebook Page
 - Local-LLM first drafts (Universal Ingestion Law)
+- TikTok token auto-refresh
 
 ---
 

@@ -29,8 +29,8 @@ from app.workers.broadcast_tasks import broadcast_fanout_task
 
 router = APIRouter()
 
-TEXT_CAPABLE = ["twitter", "reddit", "discord", "telegram"]
-MEDIA_CAPABLE = ["twitter", "reddit", "discord", "telegram", "instagram", "tiktok", "youtube"]
+TEXT_CAPABLE = ["twitter", "reddit", "discord", "telegram", "bluesky"]
+MEDIA_CAPABLE = ["twitter", "reddit", "discord", "telegram", "bluesky", "instagram", "tiktok", "youtube"]
 FANNED_OUT = [BroadcastStatus.posting, BroadcastStatus.posted, BroadcastStatus.partial]
 
 
