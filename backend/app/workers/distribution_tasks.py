@@ -8,6 +8,7 @@ def post_now_task(self, content_id: str, platforms: list[str]):
         from app.services.distribution.scheduler import DistributionScheduler
         from app.database import AsyncSessionLocal
         from app.models.content import Content, ContentStatus
+        from app.models.project import Project
         from sqlalchemy import select
         import uuid
 
@@ -21,12 +22,20 @@ def post_now_task(self, content_id: str, platforms: list[str]):
             if not content:
                 return {"error": "Content not found"}
 
+            # Council decree Phase 1 bugfix: project_slug was passed as "" here,
+            # silently dropping per-project behavior (e.g. Reddit subreddit map).
+            project_result = await db.execute(
+                select(Project).where(Project.id == content.project_id)
+            )
+            project = project_result.scalar_one_or_none()
+            project_slug = project.slug if project else ""
+
             results = await scheduler.post(
                 platforms=platforms,
                 body=content.body or content.title or "",
                 media_url=content.media_url,
                 content_type=content.content_type.value,
-                project_slug="",
+                project_slug=project_slug,
             )
 
             post_ids = {}

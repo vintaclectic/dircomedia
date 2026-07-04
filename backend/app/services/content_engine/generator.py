@@ -49,8 +49,10 @@ Return JSON with:
 
 Make it punchy, authentic, and on-brand."""
 
+        # frugal-max ruling (council 2026-07-04): Opus is never justified for
+        # social post text. Model is env-configurable via CONTENT_TEXT_MODEL.
         response = await self.client.messages.create(
-            model="claude-opus-4-6",
+            model=settings.content_text_model,
             max_tokens=1024,
             system=brand.system_prompt or "You are a social media content expert. Always return valid JSON.",
             messages=[{"role": "user", "content": prompt}],
@@ -70,7 +72,7 @@ Make it punchy, authentic, and on-brand."""
             "hashtags": data.get("hashtags", brand.hashtags[:5]),
             "prompt": prompt,
             "metadata": {
-                "model": "claude-opus-4-6",
+                "model": settings.content_text_model,
                 "project": project_slug,
                 "platforms": platforms,
                 "brand_tone": brand.tone,
@@ -99,7 +101,7 @@ Return JSON with:
 - text_overlays: list of {{time_seconds, text}} objects for motion graphics"""
 
         response = await self.client.messages.create(
-            model="claude-opus-4-6",
+            model=settings.video_script_model,
             max_tokens=1500,
             system="You are a video director and scriptwriter. Return valid JSON.",
             messages=[{"role": "user", "content": prompt}],

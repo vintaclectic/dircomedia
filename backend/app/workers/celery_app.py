@@ -9,6 +9,7 @@ celery_app = Celery(
         "app.workers.content_tasks",
         "app.workers.video_tasks",
         "app.workers.distribution_tasks",
+        "app.workers.broadcast_tasks",
     ],
 )
 
@@ -24,6 +25,7 @@ celery_app.conf.update(
     task_routes={
         "app.workers.video_tasks.*": {"queue": "video"},
         "app.workers.distribution_tasks.*": {"queue": "distribution"},
+        "app.workers.broadcast_tasks.*": {"queue": "distribution"},
         "app.workers.content_tasks.*": {"queue": "content"},
     },
     beat_schedule={
