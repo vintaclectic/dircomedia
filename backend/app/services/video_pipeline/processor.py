@@ -121,39 +121,92 @@ class VideoProcessor:
             style=style,
         )
 
-        # Generate voiceover
+        # Generate voiceover (Piper-backed — see heygen.text_to_speech).
         vo_job = await self.heygen.text_to_speech(script.get("narration", description))
-        vo_audio_url = vo_job.get("audio_url", "")
+        vo_audio_url = vo_job.get("audio_url", "") or vo_job.get("audio_path", "")
 
-        # Generate video clips for each visual prompt
+        # Generate b-roll clips for each visual prompt. External gen-video APIs
+        # (Runway) rot / 401 — treat them as OPTIONAL. Any failure just means we
+        # assemble without generative b-roll.
         clip_urls = []
         for visual_prompt in script.get("visual_prompts", [description])[:3]:
-            task = await self.runway.generate_video(
-                prompt=f"{visual_prompt}, {style}, high quality, {project_slug} brand",
-                duration=min(10, duration // len(script.get("visual_prompts", [1]))),
-            )
-            clip_url = await self.runway.poll_until_done(task["id"])
-            clip_urls.append(clip_url)
+            try:
+                task = await self.runway.generate_video(
+                    prompt=f"{visual_prompt}, {style}, high quality, {project_slug} brand",
+                    duration=min(10, duration // max(1, len(script.get("visual_prompts", [1])))),
+                )
+                clip_url = await self.runway.poll_until_done(task["id"])
+                if clip_url:
+                    clip_urls.append(clip_url)
+            except Exception as e:
+                print(f"[hype-clip] runway skipped ({str(e)[:80]}) — assembling without b-roll")
+                break
 
-        # Assemble with Creatomate
+        # Assemble. Try Creatomate first; if it (or its API) fails, fall back to
+        # the local ffmpeg builder that needs NO external render service — so a
+        # clip is ALWAYS produced.
         slug_key = project_slug.replace("-", "_")
-        modifications = {
-            "clips": [{"source": url} for url in clip_urls],
-            "narration": {"source": vo_audio_url},
-            "text_overlays": script.get("text_overlays", []),
-            "music_mood": script.get("music_mood", "hype"),
-            "brand_color": BRAND_COLORS.get(slug_key, "#ffffff"),
-        }
-
-        render_job = await self.creatomate.render(
-            template_id=_get_template(HYPE_TEMPLATES, slug_key),
-            modifications=modifications,
-        )
-        render_result = await self.creatomate.poll_until_done(render_job[0]["id"])
+        try:
+            modifications = {
+                "clips": [{"source": url} for url in clip_urls],
+                "narration": {"source": vo_audio_url},
+                "text_overlays": script.get("text_overlays", []),
+                "music_mood": script.get("music_mood", "hype"),
+                "brand_color": BRAND_COLORS.get(slug_key, "#ffffff"),
+            }
+            render_job = await self.creatomate.render(
+                template_id=_get_template(HYPE_TEMPLATES, slug_key),
+                modifications=modifications,
+            )
+            render_result = await self.creatomate.poll_until_done(render_job[0]["id"])
+            out_url = render_result.get("url")
+            status = render_result.get("status")
+            if not out_url:
+                raise RuntimeError("creatomate returned no url")
+        except Exception as e:
+            print(f"[hype-clip] creatomate skipped ({str(e)[:80]}) — local ffmpeg assembly")
+            out_url = self._local_assemble(script, vo_job, project_slug, duration)
+            status = "completed" if out_url else "failed"
 
         return {
             "content_id": content_id,
-            "output_url": render_result.get("url"),
+            "output_url": out_url,
             "script": script,
-            "status": render_result.get("status"),
+            "status": status,
         }
+
+    def _local_assemble(self, script: dict, vo_job: dict, project_slug: str, duration: int) -> str:
+        """No-external-service fallback: build a titled clip from the narration
+        audio + script text using ffmpeg. Mirrors the proven direct-build path.
+        Returns the output file path, or '' on failure."""
+        import os, subprocess, wave, contextlib, tempfile
+        try:
+            audio = vo_job.get("audio_path") or vo_job.get("audio_url")
+            if not audio or not os.path.exists(audio):
+                return ""
+            with contextlib.closing(wave.open(audio, "rb")) as w:
+                adur = w.getnframes() / float(w.getframerate() or 16000)
+            out_dir = os.environ.get("MEDIA_UPLOAD_DIR", "/tmp")
+            os.makedirs(out_dir, exist_ok=True)
+            out_path = os.path.join(out_dir, f"hype_{project_slug}_{int(__import__('time').time())}.mp4")
+            font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+            # on-screen text = narration wrapped; keep it simple + safe via textfile
+            tf = tempfile.NamedTemporaryFile("w", suffix=".txt", dir=out_dir, delete=False)
+            narr = script.get("narration", "") or f"{project_slug}"
+            tf.write("\n".join(narr[i:i+34] for i in range(0, min(len(narr), 170), 34))); tf.close()
+            bf = tempfile.NamedTemporaryFile("w", suffix=".txt", dir=out_dir, delete=False)
+            bf.write(project_slug.upper()); bf.close()
+            vf = (f"drawtext=fontfile={font}:textfile={tf.name}:fontcolor=white:fontsize=54:"
+                  f"x=(w-text_w)/2:y=(h-text_h)/2:line_spacing=16,"
+                  f"drawtext=fontfile={font}:textfile={bf.name}:fontcolor=0x7c6cff:fontsize=40:"
+                  f"x=(w-text_w)/2:y=h-200")
+            subprocess.run(
+                ["ffmpeg", "-f", "lavfi", "-i", f"color=c=0x0a0a12:s=1080x1920:d={adur:.2f}",
+                 "-i", audio, "-vf", vf, "-c:v", "libx264", "-c:a", "aac",
+                 "-pix_fmt", "yuv420p", "-r", "30", "-shortest", out_path, "-y"],
+                check=True, capture_output=True, timeout=120,
+            )
+            return out_path if os.path.exists(out_path) else ""
+        except Exception as e:
+            print(f"[hype-clip] local ffmpeg assembly failed: {str(e)[:120]}")
+            return ""
