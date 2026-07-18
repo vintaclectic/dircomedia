@@ -5,6 +5,19 @@ from typing import Optional
 from app.config import settings
 from app.services.content_engine.brand_voice import load_brand_voice
 
+# Ensure the OpenRouter/Hermes keys are in os.environ regardless of how the
+# process was started (celery forks don't always inherit exports, and pydantic
+# Settings reads .env into the Settings object — NOT into os.environ). Load the
+# backend .env into the environment so the routing below is reliable.
+try:
+    from dotenv import load_dotenv
+    for _p in ("/home/vinta/dircomedia/backend/.env", ".env"):
+        if os.path.exists(_p):
+            load_dotenv(_p, override=False)
+            break
+except Exception:
+    pass
+
 # ── Hermes/OpenRouter fallback (Vinta directive 2026-07-18) ──────────────────
 # The Anthropic account periodically runs out of credits, which killed the
 # whole video/content pipeline at the very first step (script-gen). When an
