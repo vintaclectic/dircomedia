@@ -86,6 +86,8 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"  # allow non-Settings env keys (e.g. OPENROUTER_API_KEY,
+                          # HERMES_MODEL) read directly via os.environ elsewhere
 
 
 @lru_cache
