@@ -42,14 +42,33 @@ def broadcast_fanout_task(self, broadcast_id: str):
 
             text = "\n\n".join(p for p in [broadcast.title, broadcast.body] if p).strip()
 
+            # ── REDDIT ACCOUNT-SAFETY GUARD (Vinta 2026-07-18, "approval-only") ──
+            # Reddit bans accounts that auto-blast promos to subs they don't own.
+            # Only let Reddit fan out when the target sub is on the owned allowlist
+            # (REDDIT_AUTO_SUBREDDITS). Empty allowlist = Reddit is held out of the
+            # auto path entirely; it posts only via an explicit owner approval flow.
+            platforms = list(broadcast.platforms or [])
+            reddit_skipped = False
+            if "reddit" in platforms:
+                allow = [s.strip().lower() for s in (settings.reddit_auto_subreddits or "").split(",") if s.strip()]
+                target = (getattr(broadcast, "reddit_subreddit", None) or "").strip().lower()
+                if not allow or (target and target not in allow):
+                    platforms = [p for p in platforms if p != "reddit"]
+                    reddit_skipped = True
+
             scheduler = DistributionScheduler()
             results = await scheduler.post(
-                platforms=list(broadcast.platforms or []),
+                platforms=platforms,
                 body=text,
                 media_url=broadcast.media_url,
                 content_type=broadcast.content_type,
                 project_slug=broadcast.project_slug,
             )
+            if reddit_skipped:
+                results["reddit"] = {
+                    "error": "held: approval-only (no owned subreddit allowlisted). "
+                    "Set REDDIT_AUTO_SUBREDDITS to an owned sub to enable auto-post."
+                }
 
             succeeded = [p for p, r in results.items() if "error" not in r]
             failed = [p for p, r in results.items() if "error" in r]

@@ -39,8 +39,17 @@ class Settings(BaseSettings):
 
     reddit_client_id: str = ""
     reddit_client_secret: str = ""
-    reddit_username: str = ""
-    reddit_password: str = ""
+    reddit_username: str = ""          # legacy password-flow only; unused for refresh-token auth
+    reddit_password: str = ""          # legacy; Google-login accounts have none — use refresh token
+    reddit_refresh_token: str = ""     # preferred: 3-legged OAuth (no password ever). Mint via scripts/reddit_oauth.py
+    reddit_user_agent: str = "web:com.dirco.media:v1.0 (by /u/dircomedia)"
+    reddit_redirect_uri: str = "http://localhost:8000/oauth/reddit/callback"
+    # ACCOUNT-SAFETY GUARD (Vinta 2026-07-18, "approval-only"): Reddit shadowbans
+    # accounts that auto-blast promos to subs they don't own. Reddit auto-fanout
+    # is allowed ONLY to subreddits in this allowlist (comma-separated, no r/).
+    # EMPTY = Reddit never auto-posts; every Reddit broadcast waits for explicit
+    # owner approval. Add your OWNED subs here to let auto mode post to them.
+    reddit_auto_subreddits: str = ""   # e.g. "DirHaven,Vintinuum" — owned subs only
 
     # Phase 2 platforms (council decree 2026-07-04)
     youtube_client_id: str = ""

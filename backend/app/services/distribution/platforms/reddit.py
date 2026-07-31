@@ -1,8 +1,23 @@
+import time
+
 import httpx
 from app.config import settings
 
 
 class RedditClient:
+    """Reddit poster.
+
+    Auth priority (Vinta directive 2026-07-18 — 'no password ever'):
+      1. refresh_token  → grant_type=refresh_token  (3-legged OAuth; works for
+         Google-login accounts that have NO password). Mint the refresh token
+         once via scripts/reddit_oauth.py, store as REDDIT_REFRESH_TOKEN.
+      2. password        → grant_type=password       (legacy fallback only; needs
+         a real Reddit password, which Google-OAuth accounts do not have).
+
+    Access tokens are cached with their expiry so we refresh only when needed
+    instead of on every post.
+    """
+
     BASE_URL = "https://oauth.reddit.com"
     AUTH_URL = "https://www.reddit.com/api/v1/access_token"
 
@@ -11,31 +26,49 @@ class RedditClient:
         self.client_secret = settings.reddit_client_secret
         self.username = settings.reddit_username
         self.password = settings.reddit_password
+        self.refresh_token = settings.reddit_refresh_token
+        self.user_agent = settings.reddit_user_agent
         self._access_token: str = ""
+        self._token_expiry: float = 0.0  # epoch seconds; 0 = none
+
+    def _auth_data(self) -> dict:
+        """Choose the OAuth grant based on what's configured. Refresh-token
+        first (no password), password only as a legacy fallback."""
+        if self.refresh_token:
+            return {"grant_type": "refresh_token", "refresh_token": self.refresh_token}
+        if self.username and self.password:
+            return {
+                "grant_type": "password",
+                "username": self.username,
+                "password": self.password,
+            }
+        raise RuntimeError(
+            "Reddit not configured: set REDDIT_REFRESH_TOKEN (preferred — run "
+            "scripts/reddit_oauth.py) or REDDIT_USERNAME+REDDIT_PASSWORD (legacy)."
+        )
 
     async def _get_access_token(self) -> str:
-        if self._access_token:
+        # Reuse the cached token until ~60s before it expires.
+        if self._access_token and time.time() < (self._token_expiry - 60):
             return self._access_token
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 self.AUTH_URL,
                 auth=(self.client_id, self.client_secret),
-                data={
-                    "grant_type": "password",
-                    "username": self.username,
-                    "password": self.password,
-                },
-                headers={"User-Agent": "DirCoMedia/1.0"},
+                data=self._auth_data(),
+                headers={"User-Agent": self.user_agent},
             )
             response.raise_for_status()
-            self._access_token = response.json()["access_token"]
+            body = response.json()
+            self._access_token = body["access_token"]
+            self._token_expiry = time.time() + int(body.get("expires_in", 3600))
         return self._access_token
 
     async def _headers(self) -> dict:
         token = await self._get_access_token()
         return {
             "Authorization": f"Bearer {token}",
-            "User-Agent": "DirCoMedia/1.0",
+            "User-Agent": self.user_agent,
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
