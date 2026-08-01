@@ -28,13 +28,9 @@ from .env (same file the app uses). Nothing is written automatically — it
 prints the value for you to review and paste, by design.
 """
 import base64
-import http.server
-import os
 import secrets
 import sys
-import threading
 import urllib.parse
-import webbrowser
 from pathlib import Path
 
 import httpx
@@ -68,11 +64,6 @@ def main():
         sys.exit(1)
 
     # Parse the redirect URI so the listener binds the right host/port/path.
-    parsed = urllib.parse.urlparse(redirect_uri)
-    host = parsed.hostname or "localhost"
-    port = parsed.port or 8000
-    cb_path = parsed.path or "/oauth/reddit/callback"
-
     state = secrets.token_urlsafe(24)
     scopes = "submit identity read"  # submit = post; identity = whoami; read = sanity
     authorize_url = (
@@ -89,75 +80,63 @@ def main():
         )
     )
 
-    caught = {}
-
-    class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):
-            q = urllib.parse.urlparse(self.path)
-            if q.path != cb_path:
-                self.send_response(404)
-                self.end_headers()
-                return
-            params = urllib.parse.parse_qs(q.query)
-            caught["code"] = (params.get("code") or [None])[0]
-            caught["state"] = (params.get("state") or [None])[0]
-            caught["error"] = (params.get("error") or [None])[0]
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            msg = (
-                "<h2>Reddit authorization received — you can close this tab.</h2>"
-                if caught.get("code")
-                else f"<h2>Authorization failed: {caught.get('error')}</h2>"
-            )
-            self.wfile.write(f"<html><body style='font-family:sans-serif'>{msg}</body></html>".encode())
-
-        def log_message(self, *a):
-            pass  # quiet
-
-    # NOTE: the DirCoMedia API also uses :8000. Stop it first if it's running,
-    # OR run this on a machine where :8000 is free. This listener needs the port
-    # only for the ~30 seconds of the OAuth round-trip.
-    try:
-        server = http.server.HTTPServer((host, port), Handler)
-    except OSError as e:
-        print(f"ERROR: cannot bind {host}:{port} — is the DirCoMedia API using it? ({e})")
-        print(f"       Temporarily: pm2 stop dircomedia-api, run this, then pm2 start dircomedia-api.")
-        sys.exit(1)
-
+    # ── HEADLESS-FRIENDLY paste-the-code flow ────────────────────────────────
+    # This runs on a headless WSL server: there's no browser here, and the
+    # redirect target (localhost:8000) is the SERVER's localhost, not your
+    # Windows browser's — so a listener can't catch the redirect. Instead you
+    # open the URL in YOUR browser, click Allow, and Reddit sends you to
+    #   http://localhost:8000/oauth/reddit/callback?state=...&code=XXXXX
+    # That page won't load (nothing serves it on your Windows box) — THAT'S FINE.
+    # Just copy the whole redirected URL (or just the code=... value) from the
+    # address bar and paste it back here.
     print("\n" + "=" * 72)
-    print("STEP 1 — open this URL, log in (Google is fine), click ALLOW:\n")
+    print("STEP 1 — copy this URL, paste into YOUR browser, log in (Google is")
+    print("fine), and click  ALLOW :\n")
     print(authorize_url)
-    print("\n(Trying to open it in your browser automatically…)")
+    print("\n" + "-" * 72)
+    print("STEP 2 — Reddit will redirect you to a 'localhost:8000' page that")
+    print("does NOT load. That is expected. Copy the FULL redirected URL from")
+    print("your address bar (it contains ...?state=...&code=...) and paste it")
+    print("below. You can paste the whole URL or just the code value.")
     print("=" * 72 + "\n")
+
     try:
-        webbrowser.open(authorize_url)
-    except Exception:
-        pass
-
-    print(f"Listening on {host}:{port}{cb_path} for the redirect…")
-    t = threading.Thread(target=server.handle_request, daemon=True)
-    t.start()
-    t.join(timeout=300)  # 5 min to click allow
-    server.server_close()
-
-    if caught.get("error"):
-        print(f"\nAuthorization denied/failed: {caught['error']}")
-        sys.exit(1)
-    if not caught.get("code"):
-        print("\nTimed out waiting for the redirect (5 min). Re-run and click ALLOW faster.")
-        sys.exit(1)
-    if caught.get("state") != state:
-        print("\nSTATE MISMATCH — possible CSRF, aborting. Re-run.")
+        raw = input("Paste the redirected URL (or the code) here: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print("\nNo input received. Re-run:  ./.venv/bin/python scripts/reddit_oauth.py")
         sys.exit(1)
 
-    print("\nGot the authorization code — exchanging it for a refresh token…")
+    # Accept either a full URL or a bare code. Extract code + state if present.
+    code = raw
+    got_state = None
+    if "code=" in raw or "state=" in raw:
+        qs = urllib.parse.urlparse(raw).query or raw.split("?", 1)[-1]
+        params = urllib.parse.parse_qs(qs)
+        code = (params.get("code") or [raw])[0]
+        got_state = (params.get("state") or [None])[0]
+        err = (params.get("error") or [None])[0]
+        if err:
+            print(f"\nReddit returned an error in the URL: {err}")
+            print("(access_denied = you clicked Decline; re-run and click Allow.)")
+            sys.exit(1)
+    # Reddit appends #_ to the code sometimes; strip trailing junk.
+    code = code.split("#", 1)[0].strip()
+
+    if got_state and got_state != state:
+        print("\nNote: state in the URL doesn't match this run's state.")
+        print("That's OK if you re-ran the script between opening the URL and pasting;")
+        print("continuing with the pasted code.")
+    if not code:
+        print("\nNo code found in what you pasted. Re-run and paste the full redirected URL.")
+        sys.exit(1)
+
+    print("\nExchanging the authorization code for a refresh token…")
     basic = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     resp = httpx.post(
         "https://www.reddit.com/api/v1/access_token",
         data={
             "grant_type": "authorization_code",
-            "code": caught["code"],
+            "code": code,
             "redirect_uri": redirect_uri,
         },
         headers={"Authorization": f"Basic {basic}", "User-Agent": user_agent},
