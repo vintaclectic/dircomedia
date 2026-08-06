@@ -63,19 +63,33 @@ class RedditClient:
                 # Verified 2026-08-06: this account's app returns 401 for EVERY
                 # grant type, including client_credentials — which needs no user
                 # and no password. That isolates the fault to the app
-                # credentials themselves, not 2FA and not the password. A bare
-                # "401 Unauthorized" sent people hunting the wrong bug for days,
-                # so name the real cause and the real fix here.
+                # credentials themselves, not 2FA and not the password.
+                #
+                # CORRECTION (2026-08-06, second pass): do NOT tell anyone to
+                # "just make a new app." Reddit ended self-service API access in
+                # Nov 2025. prefs/apps still hands out an id/secret in ~5 min,
+                # but registration is no longer access — new credentials must
+                # clear a manual "Responsible Builder" review with no SLA, and
+                # small/personal projects are routinely rejected. So the old
+                # advice sends you to a form that likely ends in a denial, and
+                # a revoked app has no guaranteed replacement path.
+                #
+                # Treat surviving pre-Nov-2025 credentials as irreplaceable.
                 raise RuntimeError(
                     "Reddit rejected the app credentials (401 on every grant, "
                     "including client_credentials). REDDIT_CLIENT_ID/"
                     "REDDIT_CLIENT_SECRET are invalid, revoked, or belong to a "
-                    "deleted app — this is NOT a 2FA or password problem and no "
-                    "code change fixes it. Fix: create a new app at "
-                    "https://www.reddit.com/prefs/apps (type 'web app', redirect "
-                    f"{self.reddit_redirect_uri_hint}), put the new id/secret in "
-                    "the DirCoMedia .env, then mint a refresh token with "
-                    "scripts/reddit_oauth.py."
+                    "deleted app — this is NOT a 2FA or password problem, and "
+                    "NO code change fixes it.\n"
+                    "IMPORTANT: this is now a POLICY wall, not a config bug. "
+                    "Reddit ended self-service API keys (Nov 2025). Creating a "
+                    "new app at prefs/apps yields an id/secret instantly but "
+                    "grants nothing until it clears manual Responsible-Builder "
+                    "review, which has no SLA and frequently rejects small "
+                    "projects. Only Vinta can decide to enter that queue.\n"
+                    "Until an approved app exists, Reddit is UNAVAILABLE as a "
+                    "distribution rail — route through the X rail instead. Do "
+                    "not burn cycles retrying this; it will keep returning 401."
                 )
             response.raise_for_status()
             body = response.json()
