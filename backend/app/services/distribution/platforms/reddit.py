@@ -28,6 +28,7 @@ class RedditClient:
         self.password = settings.reddit_password
         self.refresh_token = settings.reddit_refresh_token
         self.user_agent = settings.reddit_user_agent
+        self.reddit_redirect_uri_hint = settings.reddit_redirect_uri
         self._access_token: str = ""
         self._token_expiry: float = 0.0  # epoch seconds; 0 = none
 
@@ -58,6 +59,24 @@ class RedditClient:
                 data=self._auth_data(),
                 headers={"User-Agent": self.user_agent},
             )
+            if response.status_code == 401:
+                # Verified 2026-08-06: this account's app returns 401 for EVERY
+                # grant type, including client_credentials — which needs no user
+                # and no password. That isolates the fault to the app
+                # credentials themselves, not 2FA and not the password. A bare
+                # "401 Unauthorized" sent people hunting the wrong bug for days,
+                # so name the real cause and the real fix here.
+                raise RuntimeError(
+                    "Reddit rejected the app credentials (401 on every grant, "
+                    "including client_credentials). REDDIT_CLIENT_ID/"
+                    "REDDIT_CLIENT_SECRET are invalid, revoked, or belong to a "
+                    "deleted app — this is NOT a 2FA or password problem and no "
+                    "code change fixes it. Fix: create a new app at "
+                    "https://www.reddit.com/prefs/apps (type 'web app', redirect "
+                    f"{self.reddit_redirect_uri_hint}), put the new id/secret in "
+                    "the DirCoMedia .env, then mint a refresh token with "
+                    "scripts/reddit_oauth.py."
+                )
             response.raise_for_status()
             body = response.json()
             self._access_token = body["access_token"]

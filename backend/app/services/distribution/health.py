@@ -23,36 +23,42 @@ async def twitter_health() -> dict:
         from app.services.distribution.platforms.twitter import TwitterClient
         tw = TwitterClient()
         url = "https://api.twitter.com/2/users/me"
-        headers = tw._oauth_headers("GET", url)
+        params = {"user.fields": "public_metrics"}
+        headers = tw._oauth_headers("GET", url, params=params)
         async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(url, headers=headers)
-            return {"configured": True, "live": r.status_code == 200}
-    except Exception:
-        return {"configured": True, "live": False}
+            r = await client.get(url, headers=headers, params=params)
+            if r.status_code != 200:
+                return {
+                    "configured": True, "live": False,
+                    "error": f"HTTP {r.status_code}: {r.text[:160]}",
+                }
+            # Report WHICH account posts and how far it reaches — a live rail
+            # with an unknown handle is still an unusable rail.
+            me = r.json().get("data", {})
+            return {
+                "configured": True, "live": True,
+                "account": me.get("username"),
+                "followers": me.get("public_metrics", {}).get("followers_count"),
+            }
+    except Exception as e:
+        return {"configured": True, "live": False, "error": str(e)[:200]}
 
 
 async def reddit_health() -> dict:
-    configured = all([
-        cfg.reddit_client_id, cfg.reddit_client_secret,
-        cfg.reddit_username, cfg.reddit_password,
-    ])
-    if not configured:
+    # A refresh token alone is a complete config (the preferred, passwordless
+    # lane) — requiring a password here marked working setups "unconfigured".
+    has_app = bool(cfg.reddit_client_id and cfg.reddit_client_secret)
+    has_grant = bool(cfg.reddit_refresh_token or (cfg.reddit_username and cfg.reddit_password))
+    if not (has_app and has_grant):
         return {"configured": False, "live": None}
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.post(
-                "https://www.reddit.com/api/v1/access_token",
-                auth=(cfg.reddit_client_id, cfg.reddit_client_secret),
-                data={
-                    "grant_type": "password",
-                    "username": cfg.reddit_username,
-                    "password": cfg.reddit_password,
-                },
-                headers={"User-Agent": "dircomedia-health/1.0"},
-            )
-            return {"configured": True, "live": r.status_code == 200 and "access_token" in r.json()}
-    except Exception:
-        return {"configured": True, "live": False}
+        from app.services.distribution.platforms.reddit import RedditClient
+        # Probe through the real client so the health surface and the poster
+        # can never disagree about whether Reddit works.
+        await RedditClient()._get_access_token()
+        return {"configured": True, "live": True}
+    except Exception as e:
+        return {"configured": True, "live": False, "error": str(e)[:400]}
 
 
 async def instagram_health() -> dict:
