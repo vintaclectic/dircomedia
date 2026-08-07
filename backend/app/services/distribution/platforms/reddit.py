@@ -65,31 +65,46 @@ class RedditClient:
                 # and no password. That isolates the fault to the app
                 # credentials themselves, not 2FA and not the password.
                 #
-                # CORRECTION (2026-08-06, second pass): do NOT tell anyone to
-                # "just make a new app." Reddit ended self-service API access in
-                # Nov 2025. prefs/apps still hands out an id/secret in ~5 min,
-                # but registration is no longer access — new credentials must
-                # clear a manual "Responsible Builder" review with no SLA, and
-                # small/personal projects are routinely rejected. So the old
-                # advice sends you to a form that likely ends in a denial, and
-                # a revoked app has no guaranteed replacement path.
+                # CORRECTION (2026-08-07, third pass): the previous message said
+                # Reddit was "permanently closed." That overstated it and was
+                # wrong in the way that matters. Two separate things had been
+                # collapsed into one:
                 #
-                # Treat surviving pre-Nov-2025 credentials as irreplaceable.
+                #   1. The PROGRAMMATIC API. Reddit ended self-service access in
+                #      Nov 2025. prefs/apps still hands out an id/secret in ~5
+                #      min, but registration is no longer access — new creds must
+                #      clear a manual "Responsible Builder" review (no SLA, small
+                #      projects often rejected). Gated and slow: NOT closed.
+                #      There is a real application path, and an approved app gets
+                #      a genuine free tier (100 QPM, non-commercial).
+                #
+                #   2. Reddit as a DISTRIBUTION CHANNEL. Never restricted at all.
+                #      The Responsible Builder Policy governs API tokens, not
+                #      people. Posting to subreddits from Vinta's own account in
+                #      a browser needs no app, no token, and no approval, and is
+                #      the highest-traffic rail available to this funnel today.
+                #
+                # So: this 401 blocks AUTOMATED posting only. It does not block
+                # reaching Reddit. Never again report "Reddit is closed to us."
                 raise RuntimeError(
                     "Reddit rejected the app credentials (401 on every grant, "
-                    "including client_credentials). REDDIT_CLIENT_ID/"
-                    "REDDIT_CLIENT_SECRET are invalid, revoked, or belong to a "
-                    "deleted app — this is NOT a 2FA or password problem, and "
-                    "NO code change fixes it.\n"
-                    "IMPORTANT: this is now a POLICY wall, not a config bug. "
-                    "Reddit ended self-service API keys (Nov 2025). Creating a "
-                    "new app at prefs/apps yields an id/secret instantly but "
-                    "grants nothing until it clears manual Responsible-Builder "
-                    "review, which has no SLA and frequently rejects small "
-                    "projects. Only Vinta can decide to enter that queue.\n"
-                    "Until an approved app exists, Reddit is UNAVAILABLE as a "
-                    "distribution rail — route through the X rail instead. Do "
-                    "not burn cycles retrying this; it will keep returning 401."
+                    "including client_credentials, which needs no user and no "
+                    "password). REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET are "
+                    "invalid, revoked, or belong to a deleted app — this is NOT "
+                    "a 2FA or password problem, and NO code change fixes it.\n"
+                    "SCOPE OF THIS FAILURE: it blocks AUTOMATED posting only. "
+                    "Reddit is NOT closed to us. Posting manually from your own "
+                    "account requires no API, no app, and no approval — that "
+                    "rail is open right now and is the fastest one available.\n"
+                    "TO RESTORE AUTOMATION: Reddit ended self-service API keys "
+                    "under its Nov-2025 Responsible Builder policy, so "
+                    "registering at prefs/apps yields an id/secret instantly "
+                    "but grants nothing until it clears manual review. That "
+                    "review is gated and has no SLA (days to weeks, small "
+                    "projects are often rejected), so treat it as a background "
+                    "bet, never a dependency for anything time-sensitive.\n"
+                    "Do not retry this call in a loop; it will keep returning "
+                    "401 until an approved app exists."
                 )
             response.raise_for_status()
             body = response.json()

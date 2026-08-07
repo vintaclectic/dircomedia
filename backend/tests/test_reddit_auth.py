@@ -5,16 +5,25 @@ EVERY grant type, including `client_credentials` — a grant that needs no user,
 no password, and no 2FA. That isolates the fault to the app credentials
 themselves.
 
-The trap this file exists to prevent: the obvious fix ("go make a new app at
-prefs/apps") stopped being true. Reddit ended self-service API access in Nov
-2025. prefs/apps still hands out an id/secret, but registration is no longer
-access — new credentials must clear a manual Responsible-Builder review with no
-SLA that routinely rejects small projects. Telling an operator to "just make a
-new app" sends them into a queue that probably ends in a denial, and burns the
-one thing that still works (the X rail) waiting on it.
+Two traps this file exists to prevent, in both directions:
 
-So these tests assert the error message tells the *whole* truth: dead creds AND
-that no code change or re-registration reliably fixes it.
+1. UNDER-stating it: the obvious fix ("go make a new app at prefs/apps")
+   stopped being true. Reddit ended self-service API access in Nov 2025.
+   prefs/apps still hands out an id/secret, but registration is no longer
+   access — new credentials must clear a manual Responsible-Builder review with
+   no SLA that routinely rejects small projects.
+
+2. OVER-stating it (added 2026-08-07, after Vinta correctly called this out):
+   the message previously said Reddit was "UNAVAILABLE" / permanently closed.
+   That conflated two different things. The Responsible Builder Policy gates
+   API *tokens*; it does not gate *people*. Posting to subreddits from your own
+   account in a browser needs no app, no token, and no approval — that channel
+   was never closed. And even the API is gated-and-slow, not shut: there is a
+   real application path to a real free tier.
+
+So these tests assert the error message tells the *whole* truth in both
+directions: the creds are dead and re-registration isn't instant access, AND
+the failure is scoped to automation rather than to Reddit as a channel.
 """
 import pytest
 
@@ -109,8 +118,8 @@ async def test_401_does_not_promise_a_new_app_just_works(monkeypatch, client):
             "Mentioning prefs/apps without the approval caveat recreates the "
             "exact dead-end advice this test exists to prevent."
         )
-    # And it must point at the rail that actually works right now.
-    assert "x rail" in msg or "unavailable" in msg
+    # And it must point at a rail that actually works right now.
+    assert "manually" in msg or "own account" in msg
 
 
 @pytest.mark.asyncio
@@ -121,7 +130,36 @@ async def test_401_tells_caller_to_stop_retrying(monkeypatch, client):
     with pytest.raises(RuntimeError) as exc:
         await client._get_access_token()
 
-    assert "do not burn cycles retrying" in str(exc.value).lower()
+    assert "do not retry" in str(exc.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_401_scopes_failure_to_automation_not_to_reddit(monkeypatch, client):
+    """Regression (Vinta, 2026-08-07): the message must NEVER claim Reddit is
+    closed to us.
+
+    The old text said Reddit was "UNAVAILABLE as a distribution rail", which
+    caused the council to write off the single highest-traffic channel
+    available to this funnel. The Responsible Builder Policy gates API tokens,
+    not people — manual posting from your own account is unaffected.
+
+    This test fails if the doom framing ever comes back."""
+    _patch_response(monkeypatch, _FakeResponse(401))
+
+    with pytest.raises(RuntimeError) as exc:
+        await client._get_access_token()
+
+    msg = str(exc.value).lower()
+
+    # It must explicitly scope the breakage to automation...
+    assert "automated" in msg, "must say only AUTOMATED posting is blocked"
+    # ...and explicitly deny that Reddit itself is closed.
+    assert "not closed" in msg
+
+    # And it must never resurrect the absolutist framing.
+    for banned in ("permanently closed", "unavailable as a distribution",
+                   "reddit is closed"):
+        assert banned not in msg, f"doom framing regressed: {banned!r}"
 
 
 @pytest.mark.asyncio
