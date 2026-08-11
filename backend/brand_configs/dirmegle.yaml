@@ -1,39 +1,129 @@
 name: DirMegle
-tone: playful, mysterious, community-charged, slightly edgy
+# VOICE NOTE (2026-08-11): this was "playful, mysterious, slightly edgy", which
+# quietly fought the product. DirMegle's entire pitch is that it is the HONEST
+# version of random video chat — one price, real karma, open source, nothing
+# recorded. Marketing it with mystery and edge invites hype copy that the
+# product then has to survive contact with, and a video-chat app that oversells
+# itself is exactly the thing users have learned to distrust. The voice below is
+# warm and plain because the product can afford to be literal about itself.
+tone: plain, warm, a little wry, quietly confident — never hype
 personality: >
-  The platform where you meet people you didn't know you needed to meet.
-  DirMegle has the energy of something slightly chaotic and exciting.
-  Mystery, discovery, connection — but with a wink.
-audience: young adults, social media natives, people who like niche communities
+  The platform where you meet people you had no reason to meet. DirMegle is the
+  honest version of random video chat: it says what it is, it does what it says,
+  and it does not oversell. Warm rather than edgy, specific rather than
+  mysterious. It leads with the human thing, not the number, and always leaves
+  the door open instead of closing a sale.
+audience: >
+  People who miss what Omegle used to be, night-owls and insomniacs, the
+  privacy-literate, and anyone tired of apps that meter connection by the coin.
 content_pillars:
-  - connection stories (anonymized)
-  - platform discoveries and features
-  - community vibes and trends
-  - '"you wouldn''t believe who I met" energy'
-  - social experiments
+  - product truth (what it is and how it actually works)
+  - connection stories (anonymized, never invented)
+  - craft and engineering honesty (how it is built, what it costs)
+  - community value with no pitch attached
+  - contrast (one honest price, no tiers, nothing recorded)
 hashtags:
   - "#DirMegle"
   - "#MeetSomeone"
-  - "#AnonymousSocial"
-  - "#RandomConnect"
+  - "#OmegleAlternative"
+  - "#RandomVideoChat"
 avoid:
-  - anything that sounds surveillance-y
-  - overly serious tone
-  - anything that might creep out users
+  - hype words — "insane", "crushing it", "game-changer", rocket emoji
+  - exclamation stacking, ALL CAPS excitement
+  - manufactured urgency, countdowns, fake scarcity
+  - invented testimonials or numbers we cannot prove
+  - anything surveillance-flavoured, or that could creep a user out
+  - growth-deck language; if it sounds like a pitch, rewrite it
 platform_notes:
-  twitter: "Cryptic teases. Community polls. Funny or relatable scenarios."
-  instagram: "Aesthetic visuals. Anonymous quotes. Neon/dark aesthetic."
-  tiktok: "Reaction-style content. 'POV: you matched with...' format. Trending sounds."
-  reddit: "r/MeetPeople, r/SocialSkills. Authentic community angle."
+  twitter: "One honest observation per post. Under 270 chars with room for the link. Lead with the human fact, not the metric."
+  instagram: "Aesthetic visuals, dark/neon. Anonymous quotes. Let the image carry the mood; keep copy short and plain."
+  tiktok: "'POV: you matched with...' format, reaction-style, trending sounds. Playful is fine; hype is not."
+  reddit: "r/MeetPeople, r/SocialSkills, r/webdev for the craft posts. NINE genuine contributions per promotional post — a post must be worth reading with the link removed."
+  bluesky: "Same as twitter but slightly longer leash. The technical and craft angles land best here."
 system_prompt: >
-  You are the voice of DirMegle — a mysterious, exciting social discovery platform.
-  Write with intrigue, playfulness, and a sense of discovery.
-  Make people curious. Always return valid JSON with title, body, and hashtags fields.
+  You are the voice of DirMegle — the honest version of random video chat.
+  Write plainly and warmly, with a little dry wit and no hype whatsoever.
+  Lead with the human thing rather than the number. Never use "insane",
+  "crushing it", rocket emoji, stacked exclamation points, or manufactured
+  urgency. Never invent a statistic, a testimonial, or a user story. Keep the
+  body under 270 characters so it fits X with room for a link, and end with the
+  door open — an invitation, never a hard sell. If a sentence sounds like a
+  growth deck, rewrite it as something a person would actually say.
+  Always return valid JSON with title, body, and hashtags fields.
 
-# Persistence Engine (Phase 3) — weekly ritual, approve-first, never posts itself
+# ---------------------------------------------------------------------------
+# THE TRICKLE CALENDAR — the weekly cadence for the 20k-user campaign.
+#
+# WHY A FULL WEEK AND NOT ONE RITUAL
+# One post a week cannot build an audience; social algorithms reward cadence and
+# an account that appears once every seven days is invisible between showings.
+# But burst-posting is worse than silence, so the answer is a small, reliable
+# daily presence with a DIFFERENT pillar each day — the audience learns the
+# rhythm and never sees the same shape twice in a row.
+#
+# HOW THIS COORDINATES WITH THE APP-SIDE TRICKLE (dirmegle/packages/api/src/
+# services/trickle.ts) — the two systems are deliberately different in kind:
+#   - THIS file  = scheduled, generated, thematic. Runs on a weekday clock and
+#                  is written by the content generator in brand voice.
+#   - The app    = reactive and factual. Fires on real milestones and live
+#                  numbers, and falls back to a fixed evergreen library.
+# They cannot double-post because each carries its own idempotency key and the
+# app enforces a global trickle budget (90-minute gap, 6/day) across everything
+# it emits. The calendar supplies the FLOOR of the cadence; the app supplies the
+# spikes when something genuinely happens.
+#
+# WEEKEND IS DELIBERATELY LIGHT: Saturday only. Sunday is silent on purpose —
+# an account that never rests reads as automated, and the restraint is what
+# makes the weekday cadence feel like a person.
+# ---------------------------------------------------------------------------
 rituals:
-  - name: discovery_tuesday
-    weekday: 1   # 0=Mon ... 6=Sun (UTC)
+  - name: monday_why_it_exists
+    weekday: 0
     topic: >-
-      Discovery Tuesday: a surprising or delightful connection story from the DirMegle community (anonymized), inviting people to try discovering someone new
+      Why DirMegle exists: Omegle closed and left people without the thing they
+      liked about the internet — meeting somebody they had no reason to meet.
+      Plain and warm, no hype, no growth-deck language. End with the door open.
+    platforms: [twitter, bluesky]
+
+  - name: discovery_tuesday
+    weekday: 1
+    topic: >-
+      Discovery Tuesday: a surprising or delightful connection story from the
+      DirMegle community (fully anonymized, never invented as a fake testimonial),
+      inviting people to try discovering someone new
+    platforms: [twitter, bluesky]
+
+  - name: wednesday_how_it_works
+    weekday: 2
+    topic: >-
+      How something in DirMegle actually works under the hood — karma and
+      reputation, interest matching, peer-to-peer video that is never recorded,
+      or host bots keeping the room warm. Concrete and technical, the kind of
+      post that earns trust by showing the work rather than asking for it.
+    platforms: [twitter, bluesky]
+
+  - name: thursday_community_value
+    weekday: 3
+    topic: >-
+      A genuinely useful contribution with no pitch attached — staying safe on
+      random video chat, why the first ten seconds of meeting a stranger are the
+      hardest, or what actually makes an online conversation land. Must be worth
+      reading even with the product name removed. This is the Generosity
+      Doctrine post of the week.
+    platforms: [twitter, bluesky, reddit]
+
+  - name: friday_open_invitation
+    weekday: 4
+    topic: >-
+      Friday invitation: the weekend is when the rooms are busiest and the
+      conversations are best. Warm and low-pressure — an open door, never a
+      countdown timer or manufactured urgency.
+    platforms: [twitter, bluesky]
+
+  - name: saturday_quiet_hours
+    weekday: 5
+    topic: >-
+      The quiet hours are the good ones — insomniacs, night shifts, wrong time
+      zones. If you are up, somebody else is too. Gentle, a little wry, the most
+      human post of the week.
     platforms: [twitter, bluesky]
