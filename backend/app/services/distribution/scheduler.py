@@ -34,6 +34,16 @@ class DistributionScheduler:
     ) -> dict[str, dict]:
         """Post content to all specified platforms. Returns results per platform."""
         results = {}
+
+        # Re-bind X to the connection wizard's stored token, if one exists
+        # (YH9AE4D, 2026-08-12). Done per-post rather than in __init__ because
+        # __init__ is sync and the vault read is async — and because a token
+        # refreshed or reconnected after this scheduler was constructed must
+        # take effect on the very next post, not on the next process restart.
+        # Falls back to the .env client on any failure.
+        if "twitter" in platforms:
+            self.twitter = await TwitterClient.from_vault()
+
         for platform in platforms:
             try:
                 if platform == "twitter":

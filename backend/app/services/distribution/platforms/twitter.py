@@ -7,12 +7,53 @@ from app.config import settings
 class TwitterClient:
     BASE_URL = "https://api.twitter.com/2"
 
-    def __init__(self):
+    def __init__(self, user_token: str | None = None):
+        """`user_token` is an OAuth 2.0 user access token from the connection
+        wizard's credential vault. When present it takes PRECEDENCE over the
+        .env OAuth 1.0a key set and the client signs with `Bearer <token>`
+        instead of an HMAC-SHA1 signature.
+
+        Why the switch is load-bearing (YH9AE4D, 2026-08-12): the wizard mints
+        OAuth 2.0 user-context tokens, but .env carries OAuth 1.0a consumer
+        keys. These are NOT interchangeable — signing an OAuth 2.0 token as if
+        it were 1.0a produces a signature X rejects with a 401 that reads like
+        "bad credentials", sending you to rotate keys that were never wrong.
+        A vault connection that the poster couldn't see would show green on the
+        health rail and still never post: the exact silent-rot failure the
+        wizard exists to end.
+        """
+        self.user_token = user_token
         self.bearer_token = settings.twitter_bearer_token
         self.api_key = settings.twitter_api_key
         self.api_secret = settings.twitter_api_secret
         self.access_token = settings.twitter_access_token
         self.access_secret = settings.twitter_access_secret
+
+    @classmethod
+    async def from_vault(cls) -> "TwitterClient":
+        """Build a client from the wizard's stored token, falling back to .env.
+
+        Never raises: if the vault is empty, unreadable, or the key is missing,
+        the caller still gets a working .env-backed client. Degrading to the
+        previous behaviour is always better than taking the poster down.
+        """
+        try:
+            from app.database import AsyncSessionLocal
+            from app.services.oauth import store
+
+            async with AsyncSessionLocal() as db:
+                token = await store.get_access_token(db, "twitter")
+            if token:
+                return cls(user_token=token)
+        except Exception:
+            pass
+        return cls()
+
+    @property
+    def credential_source(self) -> str:
+        """'oauth_wizard' | 'env' — surfaced in post results so a failure names
+        which credential set was actually used."""
+        return "oauth_wizard" if self.user_token else "env"
 
     def _oauth_headers(
         self, method: str, url: str, params: dict = None, json_body: bool = True
@@ -29,6 +70,14 @@ class TwitterClient:
         multipart/urlencoded type with its boundary.
         """
         import time, hashlib, hmac, base64, urllib.parse, secrets
+
+        # Vault (OAuth 2.0 user context) wins over .env (OAuth 1.0a). Bearer
+        # auth signs nothing, so we return early before building a base string.
+        if self.user_token:
+            headers = {"Authorization": f"Bearer {self.user_token}"}
+            if json_body:
+                headers["Content-Type"] = "application/json"
+            return headers
 
         def encode(s: str) -> str:
             return urllib.parse.quote(str(s), safe="")
