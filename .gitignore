@@ -35,6 +35,11 @@ media/
 *.sqlite
 postgres_data/
 
+# Runtime logs / learned state (machine-local, not source)
+*.log
+backend/drip.log
+backend/learn_stats.json
+
 # OS / editor
 .DS_Store
 .idea/

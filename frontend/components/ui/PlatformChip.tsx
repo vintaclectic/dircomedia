@@ -66,6 +66,20 @@ const PLATFORM_META: Record<Platform, PlatformMeta> = {
       </svg>
     ),
   },
+  pinterest: {
+    label: "Pinterest",
+    color: "#E60023",
+    glyph: (s) => (
+      <svg viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="square" strokeLinejoin="miter" aria-hidden style={{ display: "block" }}>
+        {/* Pin-drop — faceted head over a driven spike, in the house line style */}
+        <path d="M12 2.5 L18 8 L12 13.5 L6 8 Z" />
+        <path d="M12 13.5 L10.5 21.5" strokeWidth="1.5" />
+        <circle cx="12" cy="8" r="2.1" fill="currentColor" stroke="none" />
+        <path d="M6 8 L3.5 8" strokeWidth="1.3" opacity="0.6" />
+        <path d="M18 8 L20.5 8" strokeWidth="1.3" opacity="0.6" />
+      </svg>
+    ),
+  },
   reddit: {
     label: "Reddit",
     color: "#FF4500",

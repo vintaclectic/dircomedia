@@ -47,6 +47,13 @@ celery_app.conf.update(
             "task": "app.workers.guardian_tasks.platform_health_check",
             "schedule": crontab(minute=0, hour="*/6"),  # every 6h
         },
+        # ── OAuth token renewal (YH9AE4D, 2026-08-12) ──
+        # Every 6h, offset 30 min off the health check so the two guardians
+        # never contend for the same provider rate limits in the same minute.
+        "guardian-oauth-token-refresh": {
+            "task": "app.workers.guardian_tasks.refresh_expiring_tokens",
+            "schedule": crontab(minute=30, hour="*/6"),
+        },
         "guardian-instagram-token-refresh": {
             "task": "app.workers.guardian_tasks.refresh_instagram_token",
             "schedule": crontab(minute=0, hour=8, day_of_week=1),  # Mondays 08:00 UTC

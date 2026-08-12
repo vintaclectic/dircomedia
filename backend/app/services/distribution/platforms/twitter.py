@@ -97,6 +97,55 @@ class TwitterClient:
             response.raise_for_status()
             return response.json()
 
+    async def delete_tweet(self, tweet_id: str) -> dict:
+        """Delete a tweet by id (v2 DELETE /2/tweets/:id). Used to pull a post that
+        went out with bad copy (Vinta 2026-08-07 — a metadata leak leaked into a
+        live tweet). OAuth 1.0a user context, same signing as post_tweet."""
+        url = f"{self.BASE_URL}/tweets/{tweet_id}"
+        headers = self._oauth_headers("DELETE", url)
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.delete(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+
+    async def tweet_metrics(self, tweet_ids: list[str]) -> dict:
+        """Fetch public engagement for up to 100 tweets (v2 GET /2/tweets?ids=...).
+        Returns {tweet_id: {like_count, reply_count, retweet_count, quote_count,
+        impression_count}}. Powers the drip's learn-and-adapt cadence
+        (Vinta 2026-08-11: 'learn how best they work, use stats'). App-only bearer
+        auth is fine for public_metrics; non_public (impressions) needs user-context,
+        so we sign with OAuth 1.0a to get impressions when the account owns the tweet."""
+        if not tweet_ids:
+            return {}
+        out = {}
+        for i in range(0, len(tweet_ids), 100):
+            batch = tweet_ids[i:i + 100]
+            url = f"{self.BASE_URL}/tweets"
+            params = {"ids": ",".join(batch),
+                      "tweet.fields": "public_metrics,non_public_metrics,created_at"}
+            headers = self._oauth_headers("GET", url, params=params)
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.get(url, headers=headers, params=params)
+                if r.status_code != 200:
+                    # fall back to public_metrics only (bearer) if non_public denied
+                    params.pop("tweet.fields", None)
+                    params["tweet.fields"] = "public_metrics,created_at"
+                    r = await client.get(url, headers={"Authorization": f"Bearer {self.bearer_token}"}, params=params)
+                    if r.status_code != 200:
+                        continue
+                for t in (r.json().get("data") or []):
+                    pm = t.get("public_metrics", {}) or {}
+                    nm = t.get("non_public_metrics", {}) or {}
+                    out[t["id"]] = {
+                        "like_count": pm.get("like_count", 0),
+                        "reply_count": pm.get("reply_count", 0),
+                        "retweet_count": pm.get("retweet_count", 0),
+                        "quote_count": pm.get("quote_count", 0),
+                        "impression_count": nm.get("impression_count", pm.get("impression_count", 0)),
+                        "created_at": t.get("created_at"),
+                    }
+        return out
+
     async def upload_media(self, file_path: str, media_type: str = "video/mp4") -> str:
         """Upload media and return media_id."""
         # Uses v1.1 media upload (chunked for video)

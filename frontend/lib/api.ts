@@ -7,6 +7,9 @@ import type {
   GenerateRequest,
   VideoJobOut,
   Broadcast,
+  PlatformConnection,
+  OAuthStartOut,
+  OAuthTestOut,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -117,6 +120,43 @@ export const vetoBroadcast = (id: string) =>
 export type PlatformHealth = { configured: boolean | null; live: boolean | null; error?: string };
 export const getConnectionHealth = () =>
   request<Record<string, PlatformHealth>>("/api/v1/distribution/health");
+
+// ── OAuth connection wizard (YH9AE4D, 2026-08-12) ──
+export const getConnections = () =>
+  request<PlatformConnection[]>("/api/v1/oauth/status");
+
+export const getEncryptionStatus = () =>
+  request<{ configured: boolean }>("/api/v1/oauth/encryption-status");
+
+export const startOAuth = (platform: string) =>
+  request<OAuthStartOut>(`/api/v1/oauth/${platform}/start`);
+
+export const saveAppCredentials = (platform: string, clientId: string, clientSecret: string) =>
+  request<{ saved: boolean; app_configured: boolean }>(`/api/v1/oauth/${platform}/app`, {
+    method: "POST",
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+  });
+
+export const saveManualToken = (
+  platform: string,
+  body: { access_token: string; refresh_token?: string; expires_in_days?: number }
+) =>
+  request<{ connected: boolean; account_name: string | null; expires_at: number | null }>(
+    `/api/v1/oauth/${platform}/manual-token`,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+
+export const testConnection = (platform: string) =>
+  request<OAuthTestOut>(`/api/v1/oauth/${platform}/test`, { method: "POST" });
+
+export const refreshConnection = (platform: string) =>
+  request<{ ok: boolean; expires_at: number | null; expires_in_days: number | null }>(
+    `/api/v1/oauth/${platform}/refresh`,
+    { method: "POST" }
+  );
+
+export const disconnectPlatform = (platform: string) =>
+  request<{ disconnected: boolean }>(`/api/v1/oauth/${platform}`, { method: "DELETE" });
 
 // Analytics
 export const getProjectSummary = (slug: string) =>

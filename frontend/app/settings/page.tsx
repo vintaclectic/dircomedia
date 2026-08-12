@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Eye, EyeOff, Save, ExternalLink } from "lucide-react";
+import Link from "next/link";
+import { Check, Eye, EyeOff, Save, ExternalLink, Link2 } from "lucide-react";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -224,6 +225,42 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ padding: "32px 32px", maxWidth: 860, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+
+        {/* ── OAuth wizard entry (YH9AE4D). Pasting raw keys below still works,
+            but the guided flow is the path that ends in a VERIFIED connection
+            with an encrypted, self-renewing token — so it leads. In normal
+            flow, full width, no overlap with anything. ── */}
+        <Link
+          href="/settings/connections"
+          style={{
+            display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+            padding: "16px 18px", borderRadius: 14, minWidth: 0,
+            background: "rgba(0,85,255,0.07)",
+            border: "1px solid rgba(0,85,255,0.32)",
+            textDecoration: "none",
+          }}
+        >
+          <Link2 size={20} strokeWidth={1.9} style={{ flexShrink: 0, color: "#3D8BFF" }} />
+          <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+            <div style={{ fontSize: 14.5, fontWeight: 600, color: "#f5f5f7", letterSpacing: "-0.015em" }}>
+              Connection wizard
+            </div>
+            <div style={{ fontSize: 12.5, color: "#8a8a98", lineHeight: 1.5, marginTop: 3, overflowWrap: "anywhere" }}>
+              Connect X, Reddit, Pinterest, Instagram and TikTok with guided OAuth — tokens
+              encrypted at rest and renewed automatically.
+            </div>
+          </div>
+          <span
+            style={{
+              flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center",
+              minHeight: 44, padding: "0 16px", borderRadius: 10,
+              border: "1px solid rgba(0,85,255,0.45)", background: "rgba(0,85,255,0.16)",
+              color: "#9ec2ff", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
+            }}
+          >
+            Open
+          </span>
+        </Link>
 
         {loading ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

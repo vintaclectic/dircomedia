@@ -67,6 +67,20 @@ class Settings(BaseSettings):
     bluesky_app_password: str = ""         # bsky.app → Settings → App Passwords
     owner_alert_telegram_chat_id: str = "" # personal chat for guardian alerts (falls back to channel)
 
+    # Pinterest (OAuth wizard, YH9AE4D 2026-08-12)
+    pinterest_app_id: str = ""
+    pinterest_app_secret: str = ""
+
+    # ── OAuth connection wizard (YH9AE4D, council build 2026-08-12) ──
+    # Fernet key encrypting every stored access/refresh token. Generate with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Absent/blank = credential storage fails CLOSED (never plaintext).
+    credential_encryption_key: str = ""
+    # Public base the providers redirect back to. Must match the callback URL
+    # registered in each developer app EXACTLY. Blank = derive from the request
+    # (fine for localhost dev, wrong behind a tunnel — set it in prod).
+    oauth_redirect_base: str = ""
+
     # Storage
     r2_account_id: str = ""
     r2_access_key_id: str = ""
@@ -105,3 +119,13 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+# Bridge the encryption key into os.environ. pydantic-settings reads .env into
+# THIS object, not into the process environment — but app/core/crypto.py reads
+# os.environ on purpose, so the key is resolvable from standalone scripts and
+# celery workers that never construct Settings. Without this line the API loads
+# the key fine and the worker fails closed, which is the worst kind of split
+# brain: encryption that works until it's a background job.
+import os as _os
+if settings.credential_encryption_key and not _os.environ.get("CREDENTIAL_ENCRYPTION_KEY"):
+    _os.environ["CREDENTIAL_ENCRYPTION_KEY"] = settings.credential_encryption_key

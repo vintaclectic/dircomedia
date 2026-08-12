@@ -21,6 +21,17 @@ from app.workers.celery_app import celery_app
 ALERT_REMINDER_HOURS = 24
 
 
+def _run_async(coro):
+    """Run a coroutine from a sync Celery task.
+
+    asyncio.get_event_loop() is deprecated in 3.10+ and RAISES in a thread with
+    no current loop (which is exactly where Celery's prefork/thread pools put
+    us). asyncio.run() creates and disposes its own loop, so the task works the
+    same on the first call and the thousandth.
+    """
+    return asyncio.run(coro)
+
+
 async def _alert_owner(text: str) -> bool:
     """Tell Vinta directly. Telegram first (personal chat if set), Discord fallback."""
     from app.config import settings
@@ -106,6 +117,34 @@ def platform_health_check():
         return {p: h for p, h in results.items()}
 
     return asyncio.get_event_loop().run_until_complete(_run())
+
+
+@celery_app.task(name="app.workers.guardian_tasks.refresh_expiring_tokens")
+def refresh_expiring_tokens():
+    """Renew every OAuth credential inside 3 days of expiry (YH9AE4D).
+
+    Runs every 6 hours — four attempts inside the shortest meaningful window, so
+    a single transient provider outage never costs a connection. Anything that
+    fails permanently gets needs_reconnect set (dashboard turns red with the
+    reason) AND an alert to Vinta, because a token we cannot renew ourselves is
+    the one case that needs a human.
+    """
+    async def _run():
+        from app.database import AsyncSessionLocal
+        from app.services.oauth.refresh import refresh_expiring
+
+        async with AsyncSessionLocal() as db:
+            report = await refresh_expiring(db)
+
+        if report["failed"]:
+            lines = ["⚠️ DirCoMedia Guardian", "TOKEN REFRESH FAILED — reconnect needed:"]
+            for f in report["failed"]:
+                lines.append(f"· {f['platform']}: {(f.get('error') or '')[:180]}")
+            lines.append("Fix: /settings/connections → Reconnect")
+            await _alert_owner("\n".join(lines))
+        return report
+
+    return _run_async(_run())
 
 
 @celery_app.task(name="app.workers.guardian_tasks.refresh_instagram_token")

@@ -6,7 +6,67 @@ export type ContentStatus =
   | "scheduled"
   | "posted"
   | "failed";
-export type Platform = "twitter" | "tiktok" | "instagram" | "reddit";
+export type Platform = "twitter" | "tiktok" | "instagram" | "reddit" | "pinterest";
+
+// ── OAuth connection wizard (YH9AE4D, 2026-08-12) ──
+// These MUST mirror app/api/v1/oauth.py exactly. The backend derives status in
+// one place (_derive_status) and the UI never recomputes it — if these two
+// enums ever disagree, the dashboard lies about whether an account can post.
+
+/** Platform keys the wizard manages, in canonical render order. */
+export type ConnectPlatform =
+  | "twitter" | "reddit" | "pinterest" | "instagram" | "tiktok";
+
+/**
+ * connected       — healthy, >3d of life left (or never expires)
+ * expiring        — under 3 days; the worker will renew it, but show the clock
+ * expired         — past expiry and not yet renewed
+ * needs_reconnect — refresh failed permanently; only Vinta can fix it
+ * disconnected    — no credential stored at all
+ */
+export type ConnectionStatus =
+  | "connected" | "expiring" | "expired" | "needs_reconnect" | "disconnected";
+
+/** 'oneclick' = full OAuth popup. 'manual' = guided paste (IG/TikTok gating). */
+export type ConnectMode = "oneclick" | "manual";
+
+export interface PlatformConnection {
+  platform: ConnectPlatform;
+  label: string;
+  mode: ConnectMode;
+  status: ConnectionStatus;
+  account_name: string | null;
+  expires_at: number | null;        // unix seconds, UTC
+  expires_in_days: number | null;
+  app_configured: boolean;          // developer app client id+secret present
+  needs_reconnect: boolean;
+  last_error: string | null;
+  scopes: string | null;
+  redirect_uri: string;             // exact string to register in the dev app
+  developer_portal: string;
+  docs_url: string;
+}
+
+export interface OAuthStartOut {
+  authorize_url: string;
+  state: string;
+  expires_in: number;
+}
+
+export interface OAuthTestOut {
+  ok: boolean;
+  platform: string;
+  account_name?: string | null;
+  error?: string;
+}
+
+/** postMessage payload the OAuth popup sends its opener on completion. */
+export interface OAuthPopupMessage {
+  source: "dircomedia-oauth";
+  ok: boolean;
+  platform: string;
+  message: string;
+}
 
 export interface Project {
   id: string;
