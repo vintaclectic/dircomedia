@@ -20,18 +20,38 @@ Env keys: `TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_AC
 6. Paste all five into `.env`. Verify: `POST /api/v1/distribution/test?platform=twitter` (or use QuickPost with a test message).
 7. **Multiple accounts** (per-project handles): repeat step 5's token generation per account via OAuth flow, or run 3-legged OAuth once per handle — store per-project tokens (see sec10 vault design).
 
-## 2. Reddit — client exists: `platforms/reddit.py`
-Env keys: `REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USERNAME, REDDIT_PASSWORD`
+## 2. Reddit — client exists: `platforms/reddit.py` ✓ BUILT (GSJ3WU6, 2026-08-14)
+Env keys: `REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_REFRESH_TOKEN, REDDIT_USER_AGENT, REDDIT_DEFAULT_SUBREDDIT`
+
+**Architecture:** Web app OAuth 2.0 with `duration=permanent` refresh token. Never uses script-app auth (breaks on 2FA, demands account password on disk). Proactive token refresh at 50min, permalink-based success verification (Reddit returns HTTP 200 on shadowbanned posts).
 
 1. Log into the Reddit account that will post → https://www.reddit.com/prefs/apps
 2. Scroll to bottom → **create another app…**
    - Name: `DirCoMedia`
-   - Type: **script** (owner-only personal use — this is the correct type)
-   - Redirect URI: `http://localhost:8000/oauth/reddit/callback` (required field, unused for script apps)
+   - Type: **web app** (NOT script — web apps survive 2FA and don't require password storage)
+   - Redirect URI: `http://localhost:8888/callback` (used by the bootstrap script)
 3. After creation: the string under the app name is the **client_id**; the **secret** is labeled.
-4. Fill all four env keys (username/password are the account's actual login — sec10 will migrate this to a refresh-token flow; acceptable to start).
-5. If the account has 2FA, script auth needs `password:2FAcode` format or (better) disable 2FA on a dedicated posting account and use a strong unique password.
-6. **Reality check**: Reddit hates promotional automation. Rule: 9 genuine community contributions per 1 promo post, post to your own subs (create r/DirHaven, r/DirMegle) freely, external subs manually-approved only. ARIA's generosity doctrine governs here more than anywhere.
+4. Add client credentials to `.env`:
+   ```bash
+   REDDIT_CLIENT_ID=<from step 3>
+   REDDIT_CLIENT_SECRET=<from step 3>
+   REDDIT_USER_AGENT=dircomedia:v1.0.0 (by /u/YourRedditUsername)
+   REDDIT_DEFAULT_SUBREDDIT=test  # or your target sub
+   ```
+5. Run the OAuth bootstrap script to generate the permanent refresh token:
+   ```bash
+   cd /home/vinta/dircomedia/backend
+   source .venv/bin/activate
+   python scripts/reddit_auth.py
+   ```
+   This opens your browser, prompts you to authorize the app, and captures the **refresh token**.
+6. Add the refresh token to `.env` (the script prints the exact line to add):
+   ```bash
+   REDDIT_REFRESH_TOKEN=<from script output>
+   ```
+7. Scopes granted: `identity submit read` — minimal, deny-by-default. A leaked `.env` = "can post," not "owns the account."
+8. **Reality check**: Reddit hates promotional automation. Rule: 9 genuine community contributions per 1 promo post, post to your own subs (create r/DirHaven, r/DirMegle) freely, external subs manually-approved only. ARIA's generosity doctrine governs here more than anywhere.
+9. The refresh token never expires (`duration=permanent`). Store it once, never re-authorize.
 
 ## 3. Instagram — client exists: `platforms/instagram.py`
 Env keys: `INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, INSTAGRAM_ACCESS_TOKEN`
