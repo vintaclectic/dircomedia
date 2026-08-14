@@ -134,17 +134,60 @@ class TwitterClient:
             response.raise_for_status()
             return response.json().get("data", {})
 
-    async def post_tweet(self, text: str, media_ids: list[str] = None) -> dict:
+    async def post_tweet(
+        self, text: str, media_ids: list[str] = None, reply_to: str = None
+    ) -> dict:
+        """Post a single tweet, optionally as a reply.
+
+        `reply_to` is a tweet ID; when present, this tweet posts as a reply to that
+        tweet, threading them. Paired with post_thread() for multi-tweet threads.
+        """
         url = f"{self.BASE_URL}/tweets"
         payload = {"text": text[:280]}
         if media_ids:
             payload["media"] = {"media_ids": media_ids}
+        if reply_to:
+            payload["reply"] = {"in_reply_to_tweet_id": reply_to}
 
         headers = self._oauth_headers("POST", url)
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             return response.json()
+
+    async def post_thread(self, tweets: list[str]) -> list[dict]:
+        """Post a thread of tweets, each replying to the previous.
+
+        Returns a list of response dicts (one per tweet), each containing the tweet
+        id. The first tweet posts as a standalone; each subsequent tweet replies to
+        the previous, forming a single thread. Reuses the existing idempotency logic
+        in post_tweet so a replay can't double-post.
+
+        Example:
+            client = await TwitterClient.from_vault()
+            results = await client.post_thread([
+                "The internet has a basement...",
+                "250,000 open directories, indexed...",
+                "Every search engine you use is a curated surface...",
+            ])
+            # results[0]["data"]["id"] is the thread starter's id
+        """
+        if not tweets:
+            return []
+
+        results = []
+        previous_id = None
+
+        for tweet_text in tweets:
+            result = await self.post_tweet(tweet_text, reply_to=previous_id)
+            results.append(result)
+            previous_id = result.get("data", {}).get("id")
+            if not previous_id:
+                raise RuntimeError(
+                    f"X returned no tweet id in response: {result}"
+                )
+
+        return results
 
     async def delete_tweet(self, tweet_id: str) -> dict:
         """Delete a tweet by id (v2 DELETE /2/tweets/:id). Used to pull a post that
