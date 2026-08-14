@@ -63,6 +63,10 @@ def broadcast_fanout_task(self, broadcast_id: str):
                 media_url=broadcast.media_url,
                 content_type=broadcast.content_type,
                 project_slug=broadcast.project_slug,
+                # YouTube needs the title UNFLATTENED — `text` merges title and
+                # body for feed platforms, but the SEO engine wants the topic
+                # on its own to optimise the search phrase against.
+                title=broadcast.title,
             )
             if reddit_skipped:
                 results["reddit"] = {

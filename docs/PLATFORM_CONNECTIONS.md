@@ -60,8 +60,26 @@ Env keys: `TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_ACCESS_TOKEN`
 4. Run the OAuth flow once against your own account → store access + refresh token.
 5. Fill env keys. Refresh token worker needed (24h access-token expiry).
 
-## 5. YouTube — **NO CLIENT EXISTS YET** (build task: `platforms/youtube.py`)
-New env keys to add: `YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN`
+## 5. YouTube — **CLIENT IS BUILT** (TA3SQSM, 2026-08-14). Only the credentials are missing.
+Env keys: `YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN`
+
+**What already works** (nothing left to code — do steps 1-4 below and the lane is live):
+- `platforms/youtube.py` — chunked resumable upload (8MB slices, so a 2GB video
+  costs ~8MB RAM), resume-on-drop, local paths **and** URLs, thumbnails, and an
+  `invalid_grant` error that names the 7-day-token cause instead of a bare 400.
+- `content_engine/youtube_seo.py` — AI SEO engine. YouTube is a search engine, so
+  it generates a query-led title (<=60 chars for mobile), a snippet-optimised
+  description, 12-18 tags inside the 500-char budget, and 00:00-anchored chapters.
+  Degrades to heuristics if the model is down — a dead SEO model never blocks a publish.
+- Wired into `scheduler.py` → `broadcast.js --platforms youtube` works end to end.
+
+**The 2-minute setup, then verify:**
+```bash
+cd /home/vinta/dircomedia/backend
+./.venv/bin/python scripts/youtube_auth.py           # mints the refresh token
+./.venv/bin/python scripts/youtube_test_upload.py --health
+./.venv/bin/python scripts/youtube_test_upload.py --upload --privacy private
+```
 
 1. https://console.cloud.google.com → create project `dircomedia`.
 2. **APIs & Services → Enable APIs** → enable **YouTube Data API v3**.
@@ -71,7 +89,7 @@ New env keys to add: `YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_
    `https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl`
    → capture the **refresh token**.
 6. Quota reality: default 10,000 units/day; a video upload costs 1,600 units → ~6 uploads/day ceiling. Fine for owner cadence. Community posts have NO public API — flag: community posts remain manual or browser-extension-assisted.
-7. Build `platforms/youtube.py` (Atlas's plan phase 2): resumable upload via `videos.insert`, thumbnail via `thumbnails.set`, metadata from brand config.
+7. ~~Build `platforms/youtube.py`~~ **DONE** (TA3SQSM) — resumable `videos.insert`, `thumbnails.set`, and AI SEO metadata from brand config. Run `scripts/youtube_auth.py` instead of writing the consent flow by hand.
 
 ## 6. Beyond (phase 3 candidates)
 - **Discord** (announcements to DirHaven community): trivial — bot token + channel webhook. Highest value-per-effort of everything here.

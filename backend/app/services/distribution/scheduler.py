@@ -9,6 +9,7 @@ from app.services.distribution.platforms.discord import DiscordClient
 from app.services.distribution.platforms.telegram import TelegramClient
 from app.services.distribution.platforms.youtube import YouTubeClient
 from app.services.distribution.platforms.bluesky import BlueskyClient
+from app.services.content_engine.youtube_seo import YouTubeSEO
 from app.core.exceptions import DistributionError
 
 
@@ -31,6 +32,9 @@ class DistributionScheduler:
         content_type: str = "text",
         project_slug: str = "",
         subreddits: list[str] = None,
+        title: Optional[str] = None,
+        thumbnail_url: Optional[str] = None,
+        privacy: str = "public",
     ) -> dict[str, dict]:
         """Post content to all specified platforms. Returns results per platform."""
         results = {}
@@ -65,11 +69,8 @@ class DistributionScheduler:
                 elif platform == "bluesky":
                     results["bluesky"] = await self.bluesky.post_message(body, media_url=media_url)
                 elif platform == "youtube":
-                    if not media_url or content_type not in ("video", "reel"):
-                        raise DistributionError("YouTube requires a video", "youtube")
-                    title, _, rest = body.partition("\n\n")
-                    results["youtube"] = await self.youtube.upload_video(
-                        video_url=media_url, title=title or body[:100], description=rest or body
+                    results["youtube"] = await self._post_youtube(
+                        body, media_url, content_type, project_slug, title=title
                     )
             except Exception as e:
                 results[platform] = {"error": str(e), "status": "failed"}
@@ -80,6 +81,53 @@ class DistributionScheduler:
             media_id = await self.twitter.upload_media(media_url, "video/mp4")
             return await self.twitter.post_tweet(text, media_ids=[media_id])
         return await self.twitter.post_tweet(text)
+
+    async def _post_youtube(
+        self,
+        body: str,
+        media_url: Optional[str],
+        content_type: str,
+        project_slug: str,
+        title: Optional[str] = None,
+        thumbnail_url: Optional[str] = None,
+        privacy: str = "public",
+    ) -> dict:
+        """Upload to YouTube with AI-generated SEO metadata.
+
+        YouTube is a search engine, so a broadcast's X-shaped copy ("Karma v2
+        is live") is close to worthless as a title — nobody searches that. We
+        run the body through the SEO engine to get a query-led title, a
+        snippet-optimised description, tags and chapters. If the SEO model is
+        unavailable the engine degrades to heuristics internally and we still
+        publish — discovery is an optimisation, publishing is the job.
+        """
+        if not media_url or content_type not in ("video", "reel"):
+            raise DistributionError("YouTube requires a video", "youtube")
+
+        seo = await YouTubeSEO().generate(
+            project_slug=project_slug or "dirco",
+            topic=title or body.partition("\n\n")[0][:120] or body[:120],
+            body=body,
+            # A reel is a Short: <=60s changes title budget and kills chapters.
+            duration=60 if content_type == "reel" else None,
+        )
+
+        result = await self.youtube.upload_video(
+            video_url=media_url,
+            title=seo["title"],
+            description=seo["description"],
+            tags=seo["tags"],
+            privacy=privacy,
+            thumbnail_url=thumbnail_url,
+        )
+        result["seo"] = {
+            "search_phrase": seo.get("search_phrase"),
+            "generated_by": seo.get("generated_by"),
+            "title_length": seo.get("title_length"),
+            "tag_count": len(seo.get("tags", [])),
+            "seo_error": seo.get("seo_error"),
+        }
+        return result
 
     async def _post_tiktok(self, caption: str, video_url: Optional[str]) -> dict:
         if not video_url:
