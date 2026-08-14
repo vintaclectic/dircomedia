@@ -2,16 +2,16 @@
   "min_gap_hours": 24,
   "phase": "tune (daily \u2014 early signal)",
   "best_hours_utc": [
-    14,
-    12,
-    15,
-    13
+    22,
+    2,
+    18,
+    16
   ],
   "best_angles": [
-    "sequel/legacy-hook",
-    "other"
+    "other",
+    "sequel/legacy-hook"
   ],
-  "total_posts": 13,
-  "total_signal": 5.57,
-  "updated": 1786539905
+  "total_posts": 10,
+  "total_signal": 17.68,
+  "updated": 1786730724
 }

@@ -13,6 +13,7 @@ celery_app = Celery(
         "app.workers.broadcast_tasks",
         "app.workers.guardian_tasks",
         "app.workers.persistence_tasks",
+        "app.workers.kick_youtube_pipeline",
     ],
 )
 
@@ -32,6 +33,7 @@ celery_app.conf.update(
         "app.workers.guardian_tasks.*": {"queue": "distribution"},
         "app.workers.persistence_tasks.*": {"queue": "content"},
         "app.workers.content_tasks.*": {"queue": "content"},
+        "kick_youtube_pipeline.*": {"queue": "video"},  # heavy downloads + uploads
     },
     beat_schedule={
         "collect-analytics-hourly": {
@@ -61,6 +63,11 @@ celery_app.conf.update(
         "persistence-engine-daily": {
             "task": "app.workers.persistence_tasks.run_persistence_engine",
             "schedule": crontab(minute=0, hour=14),  # daily 14:00 UTC
+        },
+        # ── Kick → YouTube automation (task 3JFWZQK, 2026-08-14) ──
+        "kick-youtube-pipeline": {
+            "task": "kick_youtube_pipeline.poll_and_upload",
+            "schedule": 1800.0,  # every 30 min — catches ended streams fast
         },
     },
 )

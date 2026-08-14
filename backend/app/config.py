@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     bluesky_app_password: str = ""         # bsky.app → Settings → App Passwords
     owner_alert_telegram_chat_id: str = "" # personal chat for guardian alerts (falls back to channel)
 
+    # Kick → YouTube automation (task 3JFWZQK, 2026-08-14)
+    kick_username: str = ""                # Kick.com channel username to monitor
+
     # Pinterest (OAuth wizard, YH9AE4D 2026-08-12)
     pinterest_app_id: str = ""
     pinterest_app_secret: str = ""

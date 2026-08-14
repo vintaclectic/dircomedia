@@ -710,6 +710,17 @@ input:focus, textarea:focus, select:focus {
 /* Hide on mobile / show on mobile */
 @media (max-width: 767px) {
   .desktop-only { display: none !important; }
+
+  /* NO-COLLISION LAW: .bottom-nav is position:fixed at z-index 40, so without
+     reserved space it sits ON TOP of the end of every scrollable page — on
+     /approvals that buried the last card's APPROVE button, i.e. the one tap
+     that earns money. Reserve its full height (48px min-height + 8px top pad
+     + 10px bottom pad) plus the iOS home-indicator inset so the final element
+     always clears it. Padding on the scroll container (not a margin on body)
+     keeps the nav flush to the viewport edge while the content stops short. */
+  main {
+    padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px)) !important;
+  }
 }
 @media (min-width: 768px) {
   .mobile-only { display: none !important; }
