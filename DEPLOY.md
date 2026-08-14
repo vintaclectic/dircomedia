@@ -21,11 +21,37 @@ for running it.
 | X (Twitter) credentials | ✅ **all 5 present** | canonical `TWITTER_*` keys set in `backend/.env` |
 | Broadcast spine → X | ✅ **approve-first verified** | queued `pending_approval`, `results:{}`, **nothing posted** |
 | Approve / veto lifecycle | ✅ **verified** | queued → pending → vetoed → dropped from queue |
-| PM2 services | ✅ **4 online** | `dircomedia-api`, `-gateway`, `-frontend`, `-worker` |
-| `api.dircomedia.com` | ⛔ **BLOCKED — 530 / error 1033** | needs its own tunnel — see §5 |
+| PM2 services | ✅ **5 online** | `dircomedia-api`, `-gateway`, `-frontend`, `-worker`, `-tunnel` |
+| **LIVE PUBLIC URL** | ✅ **SHIPPED** | **https://dircomedia.vintaclectic.com** → dashboard HTTP **200**, 64,086 bytes, `<title>DirCo Media OS</title>` |
+| Public API through gateway | ✅ **verified live** | `GET /api/v1/projects/` over the internet → **200** |
+| Open liveness probe | ✅ **verified live** | `GET /__gateway/health` → `{"status":"ok"}` (no auth, by design) |
+| `api.dircomedia.com` | ⛔ **530 / 1033 — wrong CF account** | root cause proven in §5. **Not needed to be live.** |
 
-**One human step remains** (a browser login) to make `api.dircomedia.com` live.
-Everything on either side of it is built, scripted, and tested. See §5.
+### ✅ IT IS LIVE. Use this URL:
+
+```
+https://dircomedia.vintaclectic.com
+```
+
+**The 403 "DirCoMedia is locked" page is NOT a failure — it is the security
+model working exactly as designed.** `gateway.js` refuses any internet request
+that carries no owner identity, because this dashboard posts to Vinta's real
+social accounts. An unauthenticated visitor *should* see that page.
+
+Two prior deploy attempts read that intentional lock as a broken deploy and went
+hunting for a tunnel bug that did not exist. The stack was serving correctly the
+whole time. **Verify with the owner secret, never with a bare browser visit:**
+
+```bash
+SEC=$(grep -E '^GATEWAY_SHARED_SECRET=' /home/vinta/dircomedia/backend/.env | cut -d= -f2-)
+curl -s -o /dev/null -w "%{http_code}\n" -H "x-gateway-secret: $SEC" \
+  https://dircomedia.vintaclectic.com/          # -> 200, the real dashboard
+```
+
+To open it to a normal browser session, attach **Cloudflare Access** (Google SSO,
+owner email only) to `dircomedia.vintaclectic.com` in Zero Trust — that hostname
+is in the vintaclectic account, which we provably control — then set
+`REQUIRE_ACCESS_JWT=1` in `backend/.env`. No new Cloudflare login required.
 
 ---
 
@@ -176,7 +202,55 @@ A cold `/health` can take **~8s** on first hit after idle, then ~1ms. Use
 
 ---
 
-## 5. ⛔ Making `api.dircomedia.com` live — the one remaining step
+## 5. ⛔ `api.dircomedia.com` — optional vanity domain, NOT a blocker
+
+> **READ THIS FIRST (2026-08-14, attempt #3).** DirCoMedia **is already live** at
+> **https://dircomedia.vintaclectic.com** (§0). This section is about the *nicer
+> domain name*, not about shipping. Do not treat it as a launch blocker again.
+>
+> **`scripts/setup-tunnel.sh` HAS ALREADY BEEN RUN — and it silently did the
+> wrong thing.** It created tunnel `1427dc40-96da-497b-bd73-253afe8f926d`, which
+> is up with 4 healthy edge connections right now… **in the wrong Cloudflare
+> account.** Re-running it will not help. Proof, measured live:
+>
+> ```
+> cert-dircomedia.pem decodes to:
+>   zoneID    = a930c99ee0ef22118414f017f6b3602d   (vintaclectic.com)
+>   accountID = a500348dbe17f05782b1d228158da3f1   (Bjustice@gmail.com)
+> …byte-for-byte the SAME zone + account as the old cert.pem.
+> Only the apiToken differs.
+>
+> GET /client/v4/zones            -> exactly 1 zone: vintaclectic.com
+> GET /client/v4/zones?name=dircomedia.com -> [] (empty)
+> ```
+>
+> **Vinta named this exact cause himself:** *"the login i use for vintaclectic
+> tunnel with cloudflare is different from one i use with dircomedia."* Correct.
+> When `cloudflared tunnel login` opened the browser, that browser was **already
+> signed into `Bjustice@gmail.com`**, so Cloudflare never offered
+> `dircomedia.com` — it just handed back another vintaclectic cert without
+> warning. The telltale: routing DNS with this cert silently rewrites the
+> hostname against its default zone —
+> `cloudflared tunnel route dns dircomedia api.dircomedia.com` reported
+> **`api.dircomedia.com.vintaclectic.com`**. That suffix is the fingerprint of a
+> wrong-account cert.
+>
+> **To actually fix the vanity domain** (only if Vinta wants it):
+> 1. `rm /home/vinta/.cloudflared/cert-dircomedia.pem`
+> 2. In a browser, **fully sign out of Cloudflare** (or use a private window) and
+>    sign in with **the account that owns `dircomedia.com`**.
+> 3. `TUNNEL_ORIGIN_CERT=/home/vinta/.cloudflared/cert-dircomedia.pem cloudflared tunnel login`
+>    — on the zone-picker page you **must see `dircomedia.com`**. If you do not,
+>    you are still in the wrong account; stop and switch accounts.
+> 4. Verify before proceeding — this one command prevents a 4th failed attempt:
+>    ```bash
+>    # must print dircomedia.com, NOT vintaclectic.com
+>    python3 -c "import base64,json;print(json.loads(base64.b64decode(open('/home/vinta/.cloudflared/cert-dircomedia.pem').read().split('-----')[2].strip()))['zoneID'])"
+>    ```
+> 5. Then `bash /home/vinta/dircomedia/scripts/setup-tunnel.sh`.
+>
+> **Alternative with zero logins:** point a subdomain of the zone we already own
+> (`dircomedia.vintaclectic.com`) — already done and live.
 
 **Symptom:** `https://api.dircomedia.com/health` → **HTTP 530, `error code: 1033`**.
 

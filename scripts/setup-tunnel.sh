@@ -38,6 +38,7 @@ CFD="/home/vinta/cloudflared"
 CFDIR="/home/vinta/.cloudflared"
 TUNNEL_NAME="dircomedia"
 CONFIG="$CFDIR/dircomedia.yml"
+ZONE="dircomedia.com"  # the apex zone the cert MUST own — see Step 1b preflight
 API_HOST="api.dircomedia.com"
 API_PORT=8000          # FastAPI (uvicorn app.main:app) — owner-token gated
 PM2_NAME="dircomedia-tunnel"
@@ -86,6 +87,62 @@ fi
 
 export TUNNEL_ORIGIN_CERT="$CFDIR/cert-dircomedia.pem"
 say "Using credential: $TUNNEL_ORIGIN_CERT"
+
+# --- Step 1b: PROVE the cert owns dircomedia.com ----------------------------
+# Added 2026-08-14 after this script silently built the whole stack in the WRONG
+# Cloudflare account. The mere EXISTENCE of cert-dircomedia.pem proves nothing:
+# `cloudflared tunnel login` reuses whatever account the browser was already
+# signed into, and if that was Bjustice@gmail.com it hands back another
+# vintaclectic cert with no warning. That produced tunnel 1427dc40 — healthy, 4
+# edge connections, and permanently unable to serve dircomedia.com (error 1033).
+# The tell was `route dns` rewriting the hostname as
+# "api.dircomedia.com.vintaclectic.com" — the cert's default zone leaking in.
+# So: ask Cloudflare which zones this token can actually see, and refuse to
+# build anything until dircomedia.com is one of them.
+say "Step 1b/6 — verifying the cert actually owns $ZONE"
+_cert_b64="$(sed -e '1d' -e '$d' "$CFDIR/cert-dircomedia.pem" | tr -d '\n')"
+_cf_token="$(printf '%s' "$_cert_b64" | base64 -d 2>/dev/null \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin).get("apiToken",""))' 2>/dev/null || true)"
+
+if [ -z "$_cf_token" ]; then
+  warn "could not decode an apiToken from cert-dircomedia.pem — skipping preflight"
+else
+  _zones="$(curl -sf -H "Authorization: Bearer $_cf_token" \
+    "https://api.cloudflare.com/client/v4/zones?per_page=50" 2>/dev/null \
+    | python3 -c 'import sys,json; print(" ".join(z["name"] for z in json.load(sys.stdin).get("result",[])))' 2>/dev/null || true)"
+  say "  zones visible to this cert: ${_zones:-<none>}"
+
+  case " $_zones " in
+    *" $ZONE "*)
+      say "  ✅ $ZONE is in scope — safe to proceed" ;;
+    *)
+      cat >&2 <<EOF
+
+  ❌ WRONG CLOUDFLARE ACCOUNT — refusing to build (this is the attempt-#3 trap).
+
+  cert-dircomedia.pem can see: ${_zones:-<no zones>}
+  but it CANNOT see:           $ZONE
+
+  Creating a tunnel now would "succeed", come up healthy, and still serve
+  HTTP 530 / error 1033 forever, because Cloudflare refuses cross-account
+  tunnel CNAMEs. That already happened once (tunnel 1427dc40).
+
+  FIX — the browser account is the whole problem:
+    1. rm $CFDIR/cert-dircomedia.pem
+    2. Sign OUT of Cloudflare in your browser (or use a private window),
+       then sign in with the account that owns $ZONE.
+    3. TUNNEL_ORIGIN_CERT=$CFDIR/cert-dircomedia.pem $CFD tunnel login
+       -> the zone picker MUST list $ZONE. If it does not, you are still in
+          the wrong account. Stop and switch accounts.
+    4. Re-run this script; this check will pass.
+
+  NOTE: DirCoMedia is ALREADY LIVE at https://dircomedia.vintaclectic.com —
+  this vanity domain is optional. See DEPLOY.md §0.
+
+EOF
+      die "cert does not own $ZONE (see above)" ;;
+  esac
+fi
 
 # --- Step 2: create the tunnel (idempotent) ---------------------------------
 say "Step 2/6 — ensuring tunnel '$TUNNEL_NAME' exists"
