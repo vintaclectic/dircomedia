@@ -25,7 +25,9 @@ for running it.
 | **LIVE PUBLIC URL** | ✅ **SHIPPED** | **https://dircomedia.vintaclectic.com** → dashboard HTTP **200**, 64,086 bytes, `<title>DirCo Media OS</title>` |
 | Public API through gateway | ✅ **verified live** | `GET /api/v1/projects/` over the internet → **200** |
 | Open liveness probe | ✅ **verified live** | `GET /__gateway/health` → `{"status":"ok"}` (no auth, by design) |
-| `api.dircomedia.com` | ⛔ **530 / 1033 — wrong CF account** | root cause proven in §5. **Not needed to be live.** |
+| `api.dircomedia.com` | ⛔ **530 / 1033 — tunnel minted in WRONG account** | SKD4JWF proved it: `cert.pem` accountID **a500348d…** and tunnel `AccountTag` **a500348d…** are BOTH the vintaclectic account, and no `api.dircomedia.com` CNAME exists. The dedicated tunnel did not escape the cross-account wall. Fix = `rm ~/.cloudflared/cert.pem` → `cloudflared tunnel login` **as the account owning dircomedia.com** → re-run `scripts/setup-tunnel.sh`. **Not needed to be live.** |
+| **GoDaddy A/CNAME records** | ⚠️ **IRRELEVANT — do not edit** | Both zones use Cloudflare nameservers (`alberto/paris` and `mona/toby`). GoDaddy is registrar-only; records added there are never read. |
+| **Owner browser access** | ✅ **one command** | `bash scripts/open-dashboard.sh` → `http://127.0.0.1:4699` (verified 200, `<title>DirCo Media OS</title>`, `/api/v1/projects/` 200). |
 
 ### ✅ IT IS LIVE. Use this URL:
 
