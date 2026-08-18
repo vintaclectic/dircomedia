@@ -1,17 +1,20 @@
 {
-  "min_gap_hours": 24,
-  "phase": "tune (daily \u2014 early signal)",
+  "min_gap_hours": 1,
+  "phase": "gather (hourly \u2014 building signal)",
   "best_hours_utc": [
-    22,
-    2,
+    13,
+    14,
+    15,
+    16,
+    17,
     18,
-    16
+    19,
+    20,
+    21,
+    22
   ],
-  "best_angles": [
-    "other",
-    "sequel/legacy-hook"
-  ],
-  "total_posts": 9,
-  "total_signal": 17.68,
-  "updated": 1786745118
+  "best_angles": [],
+  "total_posts": 0,
+  "total_signal": 24.59,
+  "updated": 1787043903
 }
