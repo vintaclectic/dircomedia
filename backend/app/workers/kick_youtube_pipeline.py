@@ -101,7 +101,7 @@ async def _poll_and_upload_async():
             source_id=stream_id,
             source_url=f"https://kick.com/{kick_username}?video={stream_id}",
             processed_at=datetime.now(timezone.utc),
-            metadata={"stream_title": stream_title},
+            content_metadata={"stream_title": stream_title},
         )
         db.add(processed)
         await db.commit()

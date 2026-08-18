@@ -27,8 +27,13 @@ class ProcessedContent(Base):
     target_id = Column(String, nullable=True)         # platform-specific post ID
     target_url = Column(String, nullable=True)        # published URL
 
-    # Metadata (flexible JSON for platform-specific details)
-    metadata = Column(JSON, nullable=True)            # titles, timestamps, tags, etc.
+    # Metadata (flexible JSON for platform-specific details).
+    # NOTE: the Python attribute is `content_metadata` because SQLAlchemy's
+    # Declarative API reserves `metadata` on mapped classes — using it raises
+    # InvalidRequestError at import time and takes the whole API down. The DB
+    # column stays named "metadata" via the explicit first argument, so no
+    # migration is needed.
+    content_metadata = Column("metadata", JSON, nullable=True)  # titles, timestamps, tags
 
     # Timestamps
     processed_at = Column(DateTime(timezone=True), server_default=func.now())

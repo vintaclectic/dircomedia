@@ -16,7 +16,7 @@ for running it.
 
 | Piece | State | Evidence |
 |---|---|---|
-| FastAPI backend (`:8000`) | ✅ **healthy** | `GET /health` → `200 {"status":"ok"}`, 0 restarts in 14h |
+| FastAPI backend (`:8000`) | ✅ **healthy** (fixed 2026-08-17, SKD4JWF) | `GET /health` → `200 {"status":"ok"}`. **Was crash-looping 982×** — `ProcessedContent.metadata` is a SQLAlchemy-reserved attribute and killed api+worker at import. Fixed via `content_metadata = Column("metadata", …)` (DB column unchanged, no migration). |
 | Owner auth | ✅ **fail-closed** | `/api/v1/broadcast/pending` → **401** without token, **200** with |
 | X (Twitter) credentials | ✅ **all 5 present** | canonical `TWITTER_*` keys set in `backend/.env` |
 | Broadcast spine → X | ✅ **approve-first verified** | queued `pending_approval`, `results:{}`, **nothing posted** |
@@ -26,7 +26,7 @@ for running it.
 | Public API through gateway | ✅ **verified live** | `GET /api/v1/projects/` over the internet → **200** |
 | Open liveness probe | ✅ **verified live** | `GET /__gateway/health` → `{"status":"ok"}` (no auth, by design) |
 | `api.dircomedia.com` | ⛔ **530 / 1033 — tunnel minted in WRONG account** | SKD4JWF proved it: `cert.pem` accountID **a500348d…** and tunnel `AccountTag` **a500348d…** are BOTH the vintaclectic account, and no `api.dircomedia.com` CNAME exists. The dedicated tunnel did not escape the cross-account wall. Fix = `rm ~/.cloudflared/cert.pem` → `cloudflared tunnel login` **as the account owning dircomedia.com** → re-run `scripts/setup-tunnel.sh`. **Not needed to be live.** |
-| **GoDaddy A/CNAME records** | ⚠️ **IRRELEVANT — do not edit** | Both zones use Cloudflare nameservers (`alberto/paris` and `mona/toby`). GoDaddy is registrar-only; records added there are never read. |
+| **GoDaddy A/CNAME records** | ⛔ **INERT — do not edit** (re-measured 2026-08-17) | Both zones use Cloudflare nameservers (`alberto/paris` and `mona/toby`). GoDaddy is registrar-only; records added there are never read. |
 | **Owner browser access** | ✅ **one command** | `bash scripts/open-dashboard.sh` → `http://127.0.0.1:4699` (verified 200, `<title>DirCo Media OS</title>`, `/api/v1/projects/` 200). |
 
 ### ✅ IT IS LIVE. Use this URL:
