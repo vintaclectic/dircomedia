@@ -6,14 +6,37 @@ The owner-only marketing OS. Queues posts for every connected social account and
 posts them **only after Vinta approves**. This document is the operational truth
 for running it.
 
-> ⚠️ **STATUS CORRECTION (2026-08-19, task W84PNK2):** this document's
-> "healthy / SHIPPED" rows were measured on 2026-08-17 and are **stale**.
-> As of 2026-08-19 the entire stack is **down**: zero `dircomedia-*` PM2
-> processes, ports 4600/4601/8000 dead, and
-> `https://dircomedia.vintaclectic.com` returning **502**. The hostname and
-> tunnel are still correct — there is simply no origin behind them.
-> Note also that `https://dircomedia.com` returning 200 is a **GoDaddy
-> parked page**, not this app; it has never been routed here.
+> ✅ **RESTORED 2026-08-19 (task HG5GCNB).** The stack was down (zero
+> `dircomedia-*` PM2 processes, no `ecosystem.config.js`). It is now **UP and
+> verified**: API `:8000` 200, Next `:4601` 200, gateway `:4600` 200, owner shim
+> `:4699` 200, and `https://dircomedia.vintaclectic.com` serving the real
+> dashboard (64,086 bytes, `<title>DirCo Media OS</title>`) with the owner
+> secret. Bare public visits still return **403 by design**.
+>
+> **Docker is NOT required — earlier attempts were wrong about this.**
+> `DATABASE_URL` is **SQLite** (`sqlite+aiosqlite`), so no Postgres container is
+> needed, and Redis is only used by the optional Celery workers, not by the
+> dashboard or API. The stack runs natively under PM2.
+>
+> **Two real defects were fixed:**
+> 1. `openai` was imported by `app/services/content_engine/generator.py` but was
+>    **missing from `requirements.txt`** — the API died at import with
+>    `ModuleNotFoundError: No module named 'openai'`. Installed and now pinned
+>    (`openai==3.3.1`).
+> 2. PM2 was handed the bare `uvicorn` console-script, so **Node tried to parse
+>    the Python shebang** (`SyntaxError: Invalid or unexpected token`) — and it
+>    still reported `online`, making the outage silent. Python services now
+>    launch through `scripts/start-api.sh` (bash → `python3 -m uvicorn`).
+>
+> **To bring the whole stack up (the one command that matters):**
+> ```bash
+> pm2 start /home/vinta/dircomedia/ecosystem.config.js && pm2 save
+> ```
+> Then open **http://127.0.0.1:4699** in any browser — no headers, no Cloudflare
+> setup, no Docker. `pm2 save` has been run, so `pm2 resurrect` restores all four.
+>
+> Note: `https://dircomedia.com` returning 200 is a **GoDaddy parked page**, not
+> this app; it has never been routed here.
 
 > **Scope A, as approved:** the **API** is the public surface; the **dashboard
 > stays LOCAL** (`http://127.0.0.1:4600`). Nothing about the dashboard is

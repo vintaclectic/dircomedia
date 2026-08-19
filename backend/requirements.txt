@@ -23,6 +23,7 @@ aiofiles==24.1.0
 
 # AI / Content
 anthropic==0.40.0
+openai==3.3.1
 
 # YAML parsing
 pyyaml==6.0.2
