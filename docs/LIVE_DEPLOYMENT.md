@@ -58,8 +58,12 @@ same-origin. No CORS, and no second public surface to defend.
 | `dircomedia-frontend` | 4601 | Next.js dashboard |
 | `dircomedia-api` | 8000 | FastAPI backend |
 | `dircomedia-worker` | — | Celery worker (drip, guardian, refresh) |
+| `dircomedia-shim` | 4699 | owner-secret injector for plain browser access |
+| `dircomedia-tunnel` | — | DirCoMedia's own named tunnel (`api.dircomedia.com`) |
 
-All four are in `pm2 save`, so they come back on reboot.
+All six are declared in `/home/vinta/dircomedia/ecosystem.config.js` and are in
+`pm2 save`, so they come back on reboot. Cold restore is one command:
+`pm2 start /home/vinta/dircomedia/ecosystem.config.js && pm2 save`.
 
 ---
 

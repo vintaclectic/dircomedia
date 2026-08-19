@@ -223,10 +223,26 @@ pm2 save                          # persist across reboot — run after any chan
 
 | PM2 name | What it runs | Port |
 |---|---|---|
-| `dircomedia-api` | `backend/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000` | 8000 |
-| `dircomedia-worker` | Celery — performs the actual posting | — |
+| `dircomedia-api` | `scripts/start-api.sh` → `python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000` | 8000 |
+| `dircomedia-worker` | `scripts/start-worker.sh` → Celery, queues `content,video,distribution` — performs the actual posting | — |
 | `dircomedia-gateway` | `gateway.js` | 4600 |
-| `dircomedia-frontend` | Next.js | 4601 |
+| `dircomedia-frontend` | `scripts/start-frontend.sh` → Next.js | 4601 |
+| `dircomedia-shim` | `scripts/start-shim.sh` → injects the owner secret for browser access | 4699 |
+| `dircomedia-tunnel` | `cloudflared --config ~/.cloudflared/dircomedia.yml` — DirCoMedia's own named tunnel (`api.dircomedia.com`) | — |
+
+**All six are declared in `ecosystem.config.js`.** Restore the entire stack from
+cold with one command — this is the supported path, never start them ad-hoc:
+
+```bash
+pm2 start /home/vinta/dircomedia/ecosystem.config.js
+pm2 save     # so they survive a reboot / `pm2 resurrect`
+```
+
+> `dircomedia.vintaclectic.com` is served by the **vintinuum** tunnel, not by
+> `dircomedia-tunnel`, so the dashboard stays reachable even if that process is
+> down. `api.dircomedia.com` currently returns 530 — its DNS CNAME does not
+> exist yet. That is a DNS gap, NOT a broken tunnel: the process registers 4
+> healthy edge connections. Do not "fix" it by deleting the service.
 
 **Dashboard (local only):** open **http://127.0.0.1:4600**.
 
