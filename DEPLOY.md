@@ -6,6 +6,15 @@ The owner-only marketing OS. Queues posts for every connected social account and
 posts them **only after Vinta approves**. This document is the operational truth
 for running it.
 
+> ⚠️ **STATUS CORRECTION (2026-08-19, task W84PNK2):** this document's
+> "healthy / SHIPPED" rows were measured on 2026-08-17 and are **stale**.
+> As of 2026-08-19 the entire stack is **down**: zero `dircomedia-*` PM2
+> processes, ports 4600/4601/8000 dead, and
+> `https://dircomedia.vintaclectic.com` returning **502**. The hostname and
+> tunnel are still correct — there is simply no origin behind them.
+> Note also that `https://dircomedia.com` returning 200 is a **GoDaddy
+> parked page**, not this app; it has never been routed here.
+
 > **Scope A, as approved:** the **API** is the public surface; the **dashboard
 > stays LOCAL** (`http://127.0.0.1:4600`). Nothing about the dashboard is
 > published until that is explicitly changed.
@@ -21,8 +30,8 @@ for running it.
 | X (Twitter) credentials | ✅ **all 5 present** | canonical `TWITTER_*` keys set in `backend/.env` |
 | Broadcast spine → X | ✅ **approve-first verified** | queued `pending_approval`, `results:{}`, **nothing posted** |
 | Approve / veto lifecycle | ✅ **verified** | queued → pending → vetoed → dropped from queue |
-| PM2 services | ✅ **5 online** | `dircomedia-api`, `-gateway`, `-frontend`, `-worker`, `-tunnel` |
-| **LIVE PUBLIC URL** | ✅ **SHIPPED** | **https://dircomedia.vintaclectic.com** → dashboard HTTP **200**, 64,086 bytes, `<title>DirCo Media OS</title>` |
+| PM2 services | ⛔ **0 present** (2026-08-19, W84PNK2) — `pm2 list` shows no `dircomedia-*` process at all, and there is no `ecosystem.config.js` to restore them. Was: | `dircomedia-api`, `-gateway`, `-frontend`, `-worker`, `-tunnel` |
+| **LIVE PUBLIC URL** | ⛔ **502 — ORIGIN DOWN** (re-measured 2026-08-19, W84PNK2). All five PM2 services are ABSENT (not stopped). Hostname is still correct; there is nothing behind it. Prior ✅ evidence retained below for reference only: | **https://dircomedia.vintaclectic.com** → dashboard HTTP **200**, 64,086 bytes, `<title>DirCo Media OS</title>` |
 | Public API through gateway | ✅ **verified live** | `GET /api/v1/projects/` over the internet → **200** |
 | Open liveness probe | ✅ **verified live** | `GET /__gateway/health` → `{"status":"ok"}` (no auth, by design) |
 | `api.dircomedia.com` | ⛔ **530 / 1033 — tunnel minted in WRONG account** | SKD4JWF proved it: `cert.pem` accountID **a500348d…** and tunnel `AccountTag` **a500348d…** are BOTH the vintaclectic account, and no `api.dircomedia.com` CNAME exists. The dedicated tunnel did not escape the cross-account wall. Fix = `rm ~/.cloudflared/cert.pem` → `cloudflared tunnel login` **as the account owning dircomedia.com** → re-run `scripts/setup-tunnel.sh`. **Not needed to be live.** |
