@@ -20,11 +20,14 @@
  *   1. BIND: this process listens on 127.0.0.1 only. It is not reachable from the
  *      LAN or the internet — the sole path in is the cloudflared tunnel, which
  *      dials it from this same machine.
- *   2. CLOUDFLARE ACCESS: the real identity gate, enforced at Cloudflare's edge on
- *      dircomedia.vintaclectic.com (Google SSO, owner email only). Allowed requests
- *      arrive stamped with Cf-Access-Jwt-Assertion. Set REQUIRE_ACCESS_JWT=1 once
- *      the Access application exists and this process will refuse anything without
- *      that stamp — turning Access from a curtain into a hard requirement.
+ *   2. MASTER PASSWORD (SFM8BJE, 2026-08-20): the real identity gate for public
+ *      traffic. Previously this slot held CLOUDFLARE ACCESS (Google SSO) — but
+ *      Access was never attached to the hostname, so the gate could never say yes
+ *      and every internet visit got a dead-end 403 "locked" page forever. A door
+ *      with no key cut is not security, it is an outage. Vinta now authenticates
+ *      with a scrypt-hashed master password (DIRCOMEDIA_MASTER_PASSWORD_HASH) and
+ *      carries an HMAC-signed HttpOnly session cookie. Access is still honored if
+ *      present, so attaching it later is additive and breaks nothing.
  *   3. LOCAL-CLIENT ALLOWANCE: requests genuinely arriving from this box (the
  *      tunnel, curl on localhost) are permitted so the owner can always reach the
  *      dashboard locally even if Access is mid-configuration.
@@ -42,6 +45,8 @@
 const http = require("http");
 const path = require("path");
 const fs = require("fs");
+const auth = require("./auth");
+const { loginPage } = require("./login-page");
 
 // ---- config (env-only; nothing secret is ever written into this file) --------
 function loadEnv(file) {
@@ -61,6 +66,17 @@ const API_PORT = parseInt(process.env.API_PORT || "8000", 10);
 const OWNER_TOKEN = (process.env.OWNER_API_TOKEN || "").trim();
 const SHARED_SECRET = (process.env.GATEWAY_SHARED_SECRET || "").trim();
 const REQUIRE_ACCESS_JWT = process.env.REQUIRE_ACCESS_JWT === "1";
+const PW_HASH = (process.env.DIRCOMEDIA_MASTER_PASSWORD_HASH || "").trim();
+const SESSION_SECRET = (process.env.DIRCOMEDIA_SESSION_SECRET || "").trim();
+
+if (!PW_HASH || !SESSION_SECRET) {
+  // Fail LOUD, not open. Without these the password lane cannot work, and the
+  // only remaining public behaviour would be to refuse everyone — which is the
+  // exact dead-end this gate was built to remove.
+  console.error("[gateway] FATAL: DIRCOMEDIA_MASTER_PASSWORD_HASH / DIRCOMEDIA_SESSION_SECRET missing.");
+  console.error("[gateway] Set one with: node scripts/set-master-password.js --write");
+  process.exit(1);
+}
 
 if (!OWNER_TOKEN) {
   console.error("[gateway] FATAL: OWNER_API_TOKEN missing — refusing to start.");
@@ -93,31 +109,108 @@ const server = http.createServer((req, res) => {
   }
 
   // ---- IDENTITY GATE -------------------------------------------------------
-  // A request is allowed if it proves itself one of three ways. Access is the
-  // real gate for public traffic; the others keep local/owner tooling working.
+  // A request is allowed if it proves itself one of four ways. The master
+  // password is the gate for public traffic; the rest keep local/owner/CI
+  // tooling working exactly as before.
   const accessJwt = req.headers["cf-access-jwt-assertion"];
   const hasSecret = SHARED_SECRET && safeEqual(req.headers["x-gateway-secret"] || "", SHARED_SECRET);
   const viaTunnel = Boolean(req.headers["cf-ray"] || req.headers["cf-connecting-ip"]);
+  const clientIp = req.headers["cf-connecting-ip"] || req.socket.remoteAddress || "unknown";
+  // Trust x-forwarded-proto only from the tunnel; a direct caller could spoof it,
+  // but a direct caller is loopback anyway and gets a non-Secure cookie by design.
+  const isHttps = viaTunnel && String(req.headers["x-forwarded-proto"] || "https") !== "http";
 
-  if (REQUIRE_ACCESS_JWT && !accessJwt && !hasSecret) {
-    // Hard mode: public traffic MUST carry an Access identity. Without this flag
-    // Cloudflare Access is only a curtain — anyone reaching the hostname before
-    // the Access app is attached would sail through.
-    res.writeHead(403, { "content-type": "text/plain" });
-    return res.end("Forbidden: Cloudflare Access identity required.\n");
+  const cookies = auth.parseCookies(req.headers.cookie);
+  const session = auth.verifySession(cookies[auth.COOKIE], SESSION_SECRET);
+
+  // ---- AUTH ROUTES (always reachable, even unauthenticated) ----------------
+  if (url === "/__auth/logout") {
+    res.writeHead(302, { "set-cookie": auth.clearCookie(isHttps), location: "/__auth/login" });
+    return res.end();
   }
-  if (viaTunnel && !accessJwt && !hasSecret && !REQUIRE_ACCESS_JWT) {
-    // Traffic arrived from the internet through Cloudflare but carries no Access
-    // identity — meaning the Access application is not protecting this hostname
-    // yet. Refuse rather than expose the posting surface to the open web.
-    res.writeHead(403, { "content-type": "text/html" });
-    return res.end(
-      "<!doctype html><meta charset=utf-8><title>DirCoMedia — locked</title>" +
-      "<body style=\"font:16px system-ui;background:#0b0b0f;color:#e7e7ea;padding:3rem;max-width:34rem;margin:0 auto\">" +
-      "<h1 style=\"font-size:1.25rem;margin:0 0 1rem\">DirCoMedia is locked</h1>" +
-      "<p style=\"line-height:1.6;color:#a9a9b3;margin:0\">This dashboard controls live social accounts, so it stays " +
-      "closed until Cloudflare Access is attached to this hostname. Finish the Zero Trust setup, then reload.</p></body>"
-    );
+
+  if (url.split("?")[0] === "/__auth/login") {
+    if (req.method === "GET") {
+      // Already signed in? Don't make him look at a login form.
+      if (session) { res.writeHead(302, { location: "/" }); return res.end(); }
+      const rl = auth.rateState(clientIp);
+      res.writeHead(rl.locked ? 429 : 200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        ...(rl.locked ? { "retry-after": String(rl.retryAfter) } : {}),
+      });
+      return res.end(loginPage({ locked: rl.locked, retryAfter: rl.retryAfter }));
+    }
+
+    if (req.method === "POST") {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+        if (body.length > 4096) req.destroy(); // no reason for a password form to be large
+      });
+      req.on("end", async () => {
+        // Fixed cost on EVERY attempt so timing cannot distinguish "rate-limited"
+        // from "wrong password" from "no hash configured".
+        await auth.sleep(auth.FIXED_DELAY_MS);
+
+        const rl = auth.rateState(clientIp);
+        if (rl.locked) {
+          console.warn(`[gateway] login blocked (rate-limited) ip=${clientIp} retry=${rl.retryAfter}s`);
+          res.writeHead(429, { "content-type": "text/html; charset=utf-8", "retry-after": String(rl.retryAfter) });
+          return res.end(loginPage({ locked: true, retryAfter: rl.retryAfter }));
+        }
+
+        const params = new URLSearchParams(body);
+        const ok = auth.verifyPassword(params.get("password") || "", PW_HASH);
+
+        if (!ok) {
+          const rec = auth.recordFail(clientIp);
+          const now = auth.rateState(clientIp);
+          console.warn(`[gateway] FAILED login ip=${clientIp} at=${new Date().toISOString()} strikes=${rec.strikes || 0}`);
+          res.writeHead(now.locked ? 429 : 401, { "content-type": "text/html; charset=utf-8" });
+          return res.end(loginPage({
+            error: "Incorrect password.", locked: now.locked, retryAfter: now.retryAfter,
+          }));
+        }
+
+        auth.clearFails(clientIp);
+        console.log(`[gateway] login OK ip=${clientIp} at=${new Date().toISOString()}`);
+        res.writeHead(302, {
+          "set-cookie": auth.sessionCookie(auth.issueSession(SESSION_SECRET), isHttps),
+          location: "/",
+        });
+        return res.end();
+      });
+      return;
+    }
+
+    res.writeHead(405, { "content-type": "text/plain", allow: "GET, POST" });
+    return res.end("Method Not Allowed\n");
+  }
+
+  // ---- THE GATE ITSELF -----------------------------------------------------
+  // Loopback callers (the :4699 shim, curl on this box) are trusted: the process
+  // binds 127.0.0.1, so anything without Cloudflare headers is already on the
+  // machine. This is what keeps local owner access frictionless.
+  const isLoopback = !viaTunnel;
+  const allowed = Boolean(session) || hasSecret || accessJwt || isLoopback;
+
+  if (!allowed || (REQUIRE_ACCESS_JWT && viaTunnel && !accessJwt && !hasSecret && !session)) {
+    // API callers get JSON they can act on; browsers get sent to the login page.
+    // The old dead-end 403 "locked" page is deliberately gone — it could never be
+    // resolved by the person reading it.
+    if (url.startsWith("/api/")) {
+      res.writeHead(401, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify({ detail: "Authentication required.", login: "/__auth/login" }));
+    }
+    res.writeHead(302, { location: "/__auth/login", "cache-control": "no-store" });
+    return res.end();
+  }
+
+  // Sliding renewal: a session older than a day is re-issued so a device Vinta
+  // actually uses never expires out from under him mid-use.
+  if (session && session.stale) {
+    res.setHeader("set-cookie", auth.sessionCookie(auth.issueSession(SESSION_SECRET), isHttps));
   }
 
   const isApi = url.startsWith("/api/");
@@ -157,7 +250,11 @@ server.on("upgrade", (req, socket, head) => {
   const okSecret = SHARED_SECRET && safeEqual(req.headers["x-gateway-secret"] || "", SHARED_SECRET);
   const okAccess = Boolean(req.headers["cf-access-jwt-assertion"]);
   const fromInternet = Boolean(req.headers["cf-ray"] || req.headers["cf-connecting-ip"]);
-  if (fromInternet && !okAccess && !okSecret) {
+  // The session cookie must count here too — a logged-in browser opens websockets
+  // for Next HMR/live updates, and rejecting them would break the dashboard for
+  // exactly the person who just authenticated.
+  const okSession = Boolean(auth.verifySession(auth.parseCookies(req.headers.cookie)[auth.COOKIE], SESSION_SECRET));
+  if (fromInternet && !okAccess && !okSecret && !okSession) {
     socket.destroy();
     return;
   }
@@ -180,5 +277,5 @@ server.on("upgrade", (req, socket, head) => {
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`[gateway] listening 127.0.0.1:${PORT} → next :${NEXT_PORT}, api :${API_PORT}`);
-  console.log(`[gateway] locks: shared-secret=ON access-jwt=${REQUIRE_ACCESS_JWT ? "REQUIRED" : "optional"}`);
+  console.log(`[gateway] locks: master-password=ON shared-secret=ON access-jwt=${REQUIRE_ACCESS_JWT ? "REQUIRED" : "optional"}`);
 });

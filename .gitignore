@@ -44,3 +44,7 @@ backend/learn_stats.json
 .DS_Store
 .idea/
 .vscode/
+
+# Owner master password, shown once by scripts/set-master-password.js --generate.
+# Read it, store it in a password manager, then delete the file.
+MASTER_PASSWORD.txt
