@@ -85,21 +85,23 @@ module.exports = {
       combine_logs: true,
     },
     {
-      // DirCoMedia's OWN named tunnel (1427dc40-...), living in the Cloudflare
-      // account that owns the dircomedia.com zone. It is NOT a duplicate of the
-      // vintaclectic tunnel: that one is scoped to vintaclectic.com and can
-      // never serve dircomedia.com (cross-account CNAME -> error 1033 / HTTP
-      // 530). This one serves api.dircomedia.com -> 127.0.0.1:8000.
+      // DirCoMedia's PUBLIC DASHBOARD tunnel (a7ed37e1-...), living in the
+      // Cloudflare account that owns the dircomedia.com zone (bb950374...).
       //
-      // Verified 2026-08-19: registers 4 healthy edge connections (cmh01,
-      // iad08, iad21, cmh02). api.dircomedia.com still returns 530 because its
-      // DNS CNAME has not been created yet — a SEPARATE, known issue. The
-      // tunnel process is correct and declared; do not delete it to "fix" the
-      // 530. dircomedia.vintaclectic.com does NOT depend on this process — it
-      // is served by the vintinuum-named-tunnel and stays up regardless.
+      // REPLACED the old 1427dc40-... tunnel on 2026-08-20 (task SFM8BJE). That
+      // one was minted with ~/.cloudflared/cert.pem, which belongs to the
+      // VINTACLECTIC account (a500348d...) — a different account than the zone.
+      // Cloudflare refuses cross-account tunnel CNAMEs with error 1033 (HTTP
+      // 530), which is precisely why api.dircomedia.com served 530 for weeks
+      // while everyone hunted a DNS bug that did not exist. The DNS was right;
+      // the tunnel OWNER was wrong. This tunnel was created against
+      // cert-dircomedia.pem, whose token carries the zone's own accountID.
+      //
+      // Serves dircomedia.com + www -> gateway :4600 (master-password gated),
+      // and api.dircomedia.com -> FastAPI :8000.
       name: "dircomedia-tunnel",
       script: "/home/vinta/cloudflared",
-      args: "tunnel --config /home/vinta/.cloudflared/dircomedia.yml run",
+      args: "tunnel --config /home/vinta/.cloudflared/dircomedia-dashboard.yml run",
       interpreter: "none",
       cwd: "/home/vinta/dircomedia",
       autorestart: true,

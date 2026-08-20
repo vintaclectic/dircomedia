@@ -1,5 +1,31 @@
 # DirCoMedia — Deploy & Operations
 
+> 🟢 **dircomedia.com IS LIVE (2026-08-20, task SFM8BJE).** The apex now serves the
+> real dashboard behind a **master-password login** — no Cloudflare Zero Trust, no
+> Google SSO, reachable from any device. Owner guide:
+> `~/.claude/council-loop/state/docs/SFM8BJE-dircomedia-com-setup.md`
+>
+> **Two long-standing "facts" in this file were WRONG and are corrected here:**
+>
+> 1. ~~"`https://dircomedia.com` returning 200 is a GoDaddy parked page; it has never
+>    been routed here."~~ → It is now routed here. The GoDaddy parking A records
+>    (`13.248.243.5`, `76.223.105.230`) were deleted and the apex is a proxied CNAME
+>    to tunnel `a7ed37e1-…`.
+> 2. ~~"`api.dircomedia.com` → 530/1033, fix = `rm cert.pem` + re-login."~~ → **FIXED,
+>    and no re-login was needed.** `~/.cloudflared/cert-dircomedia.pem` already held a
+>    token for the correct account (`bb950374…`, the account owning the zone). The old
+>    tunnel `1427dc40-…` was minted with `cert.pem` (account `a500348d…`, vintaclectic)
+>    — a cross-account CNAME, which Cloudflare always answers with 1033. A new tunnel
+>    created against the right cert resolved it instantly. **`api.dircomedia.com` → 200.**
+>
+> **The "DirCoMedia is locked" 403 page is GONE.** It was a door with no key cut: the
+> gateway demanded a Cloudflare Access JWT that was never configured, so it could never
+> say yes. It is replaced by a real password gate (scrypt hash, HttpOnly signed session
+> cookie, per-IP rate limiting). See `gateway.js` and `scripts/set-master-password.js`.
+>
+> **GoDaddy remains registrar-only — records added there are never read.** That part of
+> this document was always right and still is.
+
 **Task U6PAFU2 · Scope A (minimal backend only) · last verified 2026-08-14**
 
 The owner-only marketing OS. Queues posts for every connected social account and
