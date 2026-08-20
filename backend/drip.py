@@ -274,7 +274,22 @@ def main():
                                         "source": "drip"})
             nid = created.get("id")
             if not nid:
-                print(f"       ✗ create failed: {created}"); return
+                # A 409 means this exact text is ALREADY a pending row — the copy
+                # we just finalized matches one the drip created on an earlier
+                # tick. That is not a failure to recover from by giving up
+                # (SFM8BJE, 2026-08-20): the old code `return`ed here, so every
+                # hourly cron re-finalized the same text, re-hit 409, and exited
+                # WITHOUT trying any other product. The queue wedged on one post
+                # for days. Approve the existing twin instead; if we truly cannot
+                # find it, skip this product and let the loop try the next one.
+                twin = next((o for o in pend
+                             if (o.get("body") or "").strip() == final), None)
+                if twin:
+                    print(f"       ↺ already queued as {twin['id']} — approving that one")
+                    nid = twin["id"]
+                else:
+                    print(f"       ✗ create failed: {created} — skipping {p}")
+                    continue
             r = api("POST", f"/{nid}/approve")
             tw = ((r.get("results") or {}).get("twitter") or {}).get("data", {})
             print(f"       approve → status={r.get('status','?')}"

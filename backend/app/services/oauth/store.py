@@ -88,9 +88,21 @@ async def list_credentials(db: AsyncSession) -> list[PlatformCredential]:
 
 
 async def get_access_token(db: AsyncSession, platform: str) -> Optional[str]:
-    """The one function that hands out a usable token. Never log its return."""
+    """The one function that hands out a usable token. Never log its return.
+
+    A row flagged `needs_reconnect` is NOT a usable token and must never be
+    handed out (SFM8BJE, 2026-08-20). The vault takes precedence over the .env
+    key set, so returning a token we already know is broken actively SHADOWS
+    working credentials: DirCoMedia's X connection stored an OAuth 2.0
+    *app-only* token, which X rejects on user-context endpoints with
+    "403 Unsupported Authentication". That row was already marked
+    needs_reconnect with the 403 recorded — and the poster kept using it
+    anyway, so all 9 attempted posts failed while the perfectly valid OAuth
+    1.0a keys in .env sat unused. Returning None here makes the caller fall
+    back to .env, which is the whole point of the fallback existing.
+    """
     row = await get_credential(db, platform)
-    if not row:
+    if not row or row.needs_reconnect:
         return None
     try:
         return decrypt(row.access_token)
