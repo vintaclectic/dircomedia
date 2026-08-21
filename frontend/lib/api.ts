@@ -12,16 +12,20 @@ import type {
   OAuthTestOut,
 } from "./types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const OWNER_TOKEN = process.env.NEXT_PUBLIC_OWNER_TOKEN || "";
+const BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+// NOTE (2026-08-21): The gateway attaches Authorization server-side after session
+// verification (SFM8BJE). The browser NEVER carries the owner token — it would be
+// inlined into client JS chunks and shipped publicly. Credentials=include so the
+// HttpOnly session cookie rides along; the gateway turns that into a bearer token.
 function authHeaders(): Record<string, string> {
-  return OWNER_TOKEN ? { Authorization: `Bearer ${OWNER_TOKEN}` } : {};
+  return {}; // gateway handles auth; browser sends session cookie only
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
+    credentials: "include", // send HttpOnly session cookie
     headers: { "Content-Type": "application/json", ...authHeaders(), ...options?.headers },
   });
   if (!res.ok) {
@@ -80,7 +84,8 @@ export const uploadRecording = async (
   form.append("platforms", platforms.join(","));
   const res = await fetch(`${BASE}/api/v1/video/process-recording`, {
     method: "POST",
-    headers: authHeaders(),
+    credentials: "include", // send session cookie
+    // no Content-Type header for FormData — browser sets multipart/form-data with boundary
     body: form,
   });
   if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
