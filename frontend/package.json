@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postbuild": "node scripts/check-no-localhost-base.mjs",
+    "check:no-localhost": "node scripts/check-no-localhost-base.mjs"
   },
   "dependencies": {
     "next": "14.2.18",

@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { listContent, approveContent, postNow } from "@/lib/api";
 import { ContentCard } from "@/components/ContentCard";
+import { PanelError } from "@/components/ui/PanelError";
 import type { ContentStatus } from "@/lib/types";
 
 const FILTERS: { value: ContentStatus | "all"; label: string; color: string }[] = [
@@ -19,9 +20,11 @@ const mono9: React.CSSProperties = { fontFamily: "var(--font-mono), monospace", 
 
 export default function ContentPage() {
   const [filter, setFilter] = useState<ContentStatus | "all">("all");
-  const { data: content, mutate } = useSWR(["content", filter], () =>
+  const { data: content, error, mutate } = useSWR(["content", filter], () =>
     listContent({ status: filter === "all" ? undefined : filter, limit: 50 })
   );
+  // Broken fetch ≠ empty library (H3442HM).
+  const broken = !!error && !content;
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -38,7 +41,7 @@ export default function ContentPage() {
           <div style={{ ...mono9, marginBottom: 5 }}>Library</div>
           <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 40, lineHeight: 0.9, color: "#f5f5f7", letterSpacing: "0.04em" }}>CONTENT</div>
         </div>
-        <div style={{ ...mono9 }}>{content?.length ?? 0} items</div>
+        <div style={{ ...mono9 }}>{broken ? "unavailable" : `${content?.length ?? 0} items`}</div>
       </div>
 
       <div style={{ padding: "32px 32px", maxWidth: 1200, margin: "0 auto" }}>
@@ -66,7 +69,9 @@ export default function ContentPage() {
         </div>
 
         {/* Content */}
-        {!content ? (
+        {broken ? (
+          <PanelError error={error} onRetry={() => mutate()} />
+        ) : !content ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[0,1,2,3,4,5].map(i => <div key={i} className="shimmer" style={{ height: 88, borderRadius: 14 }} />)}
           </div>

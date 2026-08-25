@@ -3,6 +3,7 @@
 import useSWR from "swr";
 import { listSchedules } from "@/lib/api";
 import { format, isPast } from "date-fns";
+import { PanelError } from "@/components/ui/PanelError";
 import type { Schedule } from "@/lib/types";
 
 const mono9: React.CSSProperties = { fontFamily: "var(--font-mono), monospace", fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "#36363f" };
@@ -44,7 +45,9 @@ function Row({ s }: { s: Schedule }) {
 
 export default function SchedulePage() {
   // upcoming_only=false → everything; derive the three buckets locally.
-  const { data: all } = useSWR("schedules-all", () => listSchedules(false));
+  const { data: all, error, mutate } = useSWR("schedules-all", () => listSchedules(false));
+  // A dead API must not read as "CLEAR QUEUE" (H3442HM).
+  const broken = !!error && !all;
 
   const posted   = all?.filter(s => s.is_posted) ?? [];
   const upcoming = all?.filter(s => !s.is_posted && !isPast(new Date(s.scheduled_at))) ?? [];
@@ -72,7 +75,7 @@ export default function SchedulePage() {
             { label: "Missed",   value: missed.length, color: "#FF3B47" },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ textAlign: "right" }}>
-              <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 28, lineHeight: 0.9, color, letterSpacing: "0.04em" }}>{value}</div>
+              <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 28, lineHeight: 0.9, color, letterSpacing: "0.04em" }}>{broken ? "—" : value}</div>
               <div style={{ ...mono9, marginTop: 3 }}>{label}</div>
             </div>
           ))}
@@ -80,7 +83,9 @@ export default function SchedulePage() {
       </div>
 
       <div style={{ padding: "32px 32px", maxWidth: 900, margin: "0 auto" }}>
-        {!all ? (
+        {broken ? (
+          <PanelError error={error} onRetry={() => mutate()} />
+        ) : !all ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[0,1,2,3].map(i => <div key={i} className="shimmer" style={{ height: 72, borderRadius: 12 }} />)}
           </div>

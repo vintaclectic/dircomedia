@@ -22,15 +22,73 @@ function authHeaders(): Record<string, string> {
   return {}; // gateway handles auth; browser sends session cookie only
 }
 
+/**
+ * ApiError — the typed failure every panel can render (H3442HM, 2026-08-25).
+ *
+ * Before this, request() threw a bare Error and every SWR panel ignored the
+ * error channel entirely, so a total data outage (gateway down, 500s, the
+ * localhost:8000 build-time leak of HB6H3YW) rendered EXACTLY like "no content
+ * yet" — an empty state with a friendly headline. That is why days of outage
+ * went unnoticed. A failure must never be able to masquerade as emptiness.
+ *
+ * `status === 0` means the request never got an HTTP reply at all (DNS,
+ * refused connection, offline, CORS) — the signature of a wrong API base.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly path: string;
+  readonly body: string;
+
+  constructor(status: number, path: string, body: string) {
+    super(
+      status === 0
+        ? `Couldn't reach the API (${path})`
+        : `API ${status} on ${path}${body ? `: ${body.slice(0, 300)}` : ""}`
+    );
+    this.name = "ApiError";
+    this.status = status;
+    this.path = path;
+    this.body = body;
+  }
+
+  /** True when the browser never reached a server — network/base-URL class. */
+  get unreachable() {
+    return this.status === 0;
+  }
+
+  /** Short human line for a panel banner. Never leaks a stack trace. */
+  get headline() {
+    if (this.status === 0) return "Couldn't reach the API";
+    if (this.status === 401 || this.status === 403) return "Session expired";
+    if (this.status === 404) return "Endpoint not found";
+    if (this.status >= 500) return "The API returned an error";
+    return `Request failed (${this.status})`;
+  }
+
+  get detail() {
+    if (this.status === 0)
+      return "The dashboard could not connect. The gateway may be down, or this build is pointed at the wrong API base.";
+    if (this.status === 401 || this.status === 403)
+      return "Sign in again to continue.";
+    return this.body ? this.body.slice(0, 300) : `HTTP ${this.status} from ${this.path}`;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    credentials: "include", // send HttpOnly session cookie
-    headers: { "Content-Type": "application/json", ...authHeaders(), ...options?.headers },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...options,
+      credentials: "include", // send HttpOnly session cookie
+      headers: { "Content-Type": "application/json", ...authHeaders(), ...options?.headers },
+    });
+  } catch (e) {
+    // fetch() only rejects when no HTTP response happened at all.
+    throw new ApiError(0, path, e instanceof Error ? e.message : String(e));
+  }
   if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`API ${res.status}: ${error}`);
+    const error = await res.text().catch(() => "");
+    throw new ApiError(res.status, path, error);
   }
   return res.json();
 }
@@ -82,13 +140,19 @@ export const uploadRecording = async (
   form.append("file", file);
   form.append("project_slug", projectSlug);
   form.append("platforms", platforms.join(","));
-  const res = await fetch(`${BASE}/api/v1/video/process-recording`, {
-    method: "POST",
-    credentials: "include", // send session cookie
-    // no Content-Type header for FormData — browser sets multipart/form-data with boundary
-    body: form,
-  });
-  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+  const path = "/api/v1/video/process-recording";
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      credentials: "include", // send session cookie
+      // no Content-Type header for FormData — browser sets multipart/form-data with boundary
+      body: form,
+    });
+  } catch (e) {
+    throw new ApiError(0, path, e instanceof Error ? e.message : String(e));
+  }
+  if (!res.ok) throw new ApiError(res.status, path, await res.text().catch(() => ""));
   return res.json();
 };
 

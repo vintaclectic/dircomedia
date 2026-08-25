@@ -4,15 +4,20 @@ import { useState } from "react";
 import useSWR from "swr";
 import { getProjectSummary, getStrategy, getProjects } from "@/lib/api";
 import { PROJECT_COLORS } from "@/components/ProjectSelector";
+import { PanelError } from "@/components/ui/PanelError";
 
 const mono9: React.CSSProperties = { fontFamily: "var(--font-mono), monospace", fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "#36363f" };
 
 export default function AnalyticsPage() {
-  const { data: projects } = useSWR("projects", getProjects);
+  const { data: projects, error: projectsError, mutate: mutateProjects } = useSWR("projects", getProjects);
   const [selected, setSelected] = useState("dirco");
 
-  const { data: summary } = useSWR(["summary", selected], () => getProjectSummary(selected));
-  const { data: strategy } = useSWR(["strategy", selected], () => getStrategy(selected));
+  const { data: summary,  error: summaryError,  mutate: mutateSummary }  = useSWR(["summary", selected],  () => getProjectSummary(selected));
+  const { data: strategy, error: strategyError, mutate: mutateStrategy } = useSWR(["strategy", selected], () => getStrategy(selected));
+
+  // "NO DATA YET" is a lie when the API is unreachable (H3442HM).
+  const projectsBroken = !!projectsError && !projects;
+  const dataBroken = (!!summaryError && !summary) || (!!strategyError && !strategy);
 
   const accent = PROJECT_COLORS[selected] || "#0055FF";
 
@@ -55,8 +60,21 @@ export default function AnalyticsPage() {
 
       <div style={{ padding: "32px 32px", maxWidth: 1200, margin: "0 auto" }}>
 
+        {projectsBroken && (
+          <div style={{ marginBottom: 20 }}>
+            <PanelError error={projectsError} onRetry={() => mutateProjects()} compact />
+          </div>
+        )}
+
         {/* Stats grid */}
-        {summary ? (
+        {dataBroken && !summary ? (
+          <div style={{ marginBottom: 36 }}>
+            <PanelError
+              error={summaryError ?? strategyError}
+              onRetry={() => Promise.all([mutateSummary(), mutateStrategy()])}
+            />
+          </div>
+        ) : summary ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 36 }}>
             {[
               { label: "Impressions", value: String(summary.total_impressions ?? 0) },
@@ -109,7 +127,7 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {!summary && !strategy && (
+        {!summary && !strategy && !dataBroken && (
           <div style={{ background: "#0b0b14", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "72px 32px", textAlign: "center" }}>
             <div style={{ fontFamily: "var(--font-display), sans-serif", fontSize: 44, color: "#f5f5f7", letterSpacing: "0.04em", marginBottom: 10 }}>NO DATA YET</div>
             <div style={{ fontSize: 13, color: "#56565f", lineHeight: 1.6 }}>Post some content first to see analytics.</div>

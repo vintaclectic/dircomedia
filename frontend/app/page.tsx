@@ -6,6 +6,7 @@ import { listContent, getProjects, postNow, approveContent } from "@/lib/api";
 import { ContentCard } from "@/components/ContentCard";
 import { QuickPost } from "@/components/QuickPost";
 import { PROJECT_COLORS } from "@/components/ProjectSelector";
+import { PanelError } from "@/components/ui/PanelError";
 
 // ─── animated counter ────────────────────────────────────────────────────────
 function Num({ n }: { n: number }) {
@@ -65,8 +66,14 @@ function Stat({ label, value, color, sub }: { label: string; value: number; colo
 
 // ─── dashboard ───────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { data: content, mutate } = useSWR("content", () => listContent({ limit: 12 }));
-  const { data: projects } = useSWR("projects", getProjects);
+  const { data: content, error: contentError, mutate } = useSWR("content", () => listContent({ limit: 12 }));
+  const { data: projects, error: projectsError, mutate: mutateProjects } = useSWR("projects", getProjects);
+
+  // A failed fetch must never render as an empty state (H3442HM). SWR keeps the
+  // last good data on a background refresh failure, so only surface the banner
+  // when we have an error AND nothing to show.
+  const contentBroken  = !!contentError  && !content;
+  const projectsBroken = !!projectsError && !projects;
 
   const total     = content?.length ?? 0;
   const posted    = content?.filter(c => c.status === "posted").length ?? 0;
@@ -105,8 +112,19 @@ export default function Dashboard() {
       {/* body */}
       <div style={{ padding: "36px 32px", maxWidth: 1560, margin: "0 auto" }}>
 
+        {/* data-layer alarm — the counters read 0 when the API is down, which is
+            indistinguishable from a real zero. Say so out loud. */}
+        {(contentBroken || projectsBroken) && (
+          <div style={{ marginBottom: 20 }}>
+            <PanelError
+              error={contentError ?? projectsError}
+              onRetry={() => Promise.all([mutate(), mutateProjects()])}
+            />
+          </div>
+        )}
+
         {/* stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 40 }}>
+        <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 40 }}>
           <Stat label="Projects"  value={nProjects} color="#0055FF" sub={nProjects > 0 ? "live" : undefined} />
           <Stat label="Content"   value={total}     color="#7C3AED" />
           <Stat label="Posted"    value={posted}    color="#00DD88" sub={posted > 0 ? `+${posted}` : undefined} />
@@ -114,7 +132,7 @@ export default function Dashboard() {
         </div>
 
         {/* two-col */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: 24 }}>
+        <div className="two-col" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 400px", gap: 24, alignItems: "start" }}>
 
           {/* stream */}
           <div>
@@ -126,7 +144,9 @@ export default function Dashboard() {
               <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 9, color: "#36363f", letterSpacing: "0.16em", textTransform: "uppercase" }}>{total} items</span>
             </div>
 
-            {!content ? (
+            {contentBroken ? (
+              <PanelError error={contentError} onRetry={() => mutate()} />
+            ) : !content ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {[0,1,2,3].map(i => <div key={i} className="shimmer" style={{ height: 88, borderRadius: 14 }} />)}
               </div>
@@ -151,7 +171,9 @@ export default function Dashboard() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <QuickPost />
 
-            {projects && projects.length > 0 && (
+            {projectsBroken ? (
+              <PanelError error={projectsError} onRetry={() => mutateProjects()} compact />
+            ) : projects && projects.length > 0 ? (
               <div style={{ background: "#0b0b14", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "18px 18px 14px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <span style={{ fontFamily: "var(--font-mono), monospace", fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "#36363f" }}>Galaxy</span>
@@ -169,14 +191,19 @@ export default function Dashboard() {
                   })}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
 
       <style>{`
-        @media(max-width:1100px){.two-col{grid-template-columns:1fr !important}}
-        @media(max-width:640px){.stat-grid{grid-template-columns:repeat(2,1fr) !important}}
+        /* H3442HM: these queries existed but the classes were never applied, so
+           the 400px right rail never collapsed and rendered OFFSCREEN below
+           1100px. Classes are now attached; minmax(0,1fr) keeps a long error
+           string from blowing the column out. */
+        @media(max-width:1100px){.two-col{grid-template-columns:minmax(0,1fr) !important}}
+        @media(max-width:640px){.stat-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important}}
+        @media(max-width:420px){.stat-grid{grid-template-columns:minmax(0,1fr) !important}}
       `}</style>
     </div>
   );

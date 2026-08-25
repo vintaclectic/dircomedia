@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import { getProjects } from "@/lib/api";
+import { PanelError } from "@/components/ui/PanelError";
 import { clsx } from "clsx";
 
 // Project colors — corrected to spec
@@ -21,7 +22,12 @@ interface ProjectSelectorProps {
 }
 
 export function ProjectSelector({ value, onChange }: ProjectSelectorProps) {
-  const { data: projects } = useSWR("projects", getProjects);
+  const { data: projects, error, mutate } = useSWR("projects", getProjects);
+
+  // A dead projects call used to shimmer forever — an outage disguised as loading.
+  if (error && !projects) {
+    return <PanelError error={error} onRetry={() => mutate()} compact />;
+  }
 
   if (!projects) {
     return (
