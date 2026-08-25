@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Eye, EyeOff, Save, ExternalLink, Link2 } from "lucide-react";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Same-origin by default. NEVER fall back to an absolute localhost URL: the
+// browser is the VISITOR's machine, so "http://localhost:8000" makes it call
+// itself and every panel renders empty. "" -> /api/* through the gateway,
+// which attaches the owner token server-side. Matches lib/api.ts.
+const BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 const mono9: React.CSSProperties = {
   fontFamily: "var(--font-mono), monospace",
