@@ -70,8 +70,31 @@ module.exports = {
       combine_logs: true,
     },
     {
-      // Celery fan-out — the process that PERFORMS the posting, plus the beat
-      // guardians (analytics, due-schedule sweep, OAuth token refresh). Verified
+      // Celery BEAT — the process that ENQUEUES every scheduled task. Missing
+      // from this file until ZBG52ZY (2026-08-27), which meant the entire
+      // beat_schedule in celery_app.py was dead code: scheduled posts never
+      // published, OAuth tokens were never refreshed (so they silently expired
+      // and the dashboard reported the whole rail dead), analytics never
+      // collected. The worker below consumes tasks; only beat creates the
+      // scheduled ones. Both are required — one without the other is a
+      // marketing OS that quietly does nothing on a timer.
+      //
+      // NEVER run two of these: a second beat double-fires every scheduled
+      // post. instances stays 1, always.
+      name: "dircomedia-beat",
+      script: "/home/vinta/dircomedia/scripts/start-beat.sh",
+      interpreter: "bash",
+      cwd: "/home/vinta/dircomedia/backend",
+      instances: 1,
+      autorestart: true,
+      max_restarts: 20,
+      combine_logs: true,
+    },
+    {
+      // Celery fan-out — the process that PERFORMS the posting. The beat
+      // guardians (analytics, due-schedule sweep, OAuth token refresh) run in
+      // the SEPARATE dircomedia-beat process above; this one only consumes
+      // what beat enqueues. Verified
       // 2026-08-19: boots to "celery@Vinta ready" with all 13 tasks registered
       // against redis://localhost:6379. Nothing posts without this running, so
       // its absence looks like "approved post never went out" rather than an
