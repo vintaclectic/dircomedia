@@ -172,12 +172,41 @@ async def check_all() -> dict[str, dict]:
         for name, r in zip(names, results)
     }
 
-    # Vault wins where it has an opinion. A platform Vinta connected through the
-    # wizard is described by its stored credential, not by whatever stale key
-    # happens to sit in .env.
+    # Vault wins where it has a WORKING opinion. A platform Vinta connected
+    # through the wizard is described by its stored credential, not by whatever
+    # stale key happens to sit in .env.
+    #
+    # But a DEAD vault entry is not a better opinion than a LIVE .env lane
+    # (ZBG52ZY, 2026-08-27). X's wizard token expired and its dead entry
+    # overwrote a probe that was returning live=True on the OAuth 1.0a keys —
+    # so the dashboard showed the whole rail broken while posting worked fine.
+    # That is worse than useless: it reports an outage that is not happening
+    # and sends Vinta to fix credentials that were never wrong. When the vault
+    # says dead and .env says live, .env is the truth the poster will actually
+    # use (get_access_token refuses expired/needs_reconnect rows and falls
+    # back), so the rail must say live too — and name the lane carrying it.
     vault = await vault_health()
     vault.pop("_vault_error", None)
     for platform, entry in vault.items():
+        env_entry = merged.get(platform)
+        if (
+            not entry.get("live")
+            and isinstance(env_entry, dict)
+            and env_entry.get("live") is True
+        ):
+            # Keep the live .env truth, but preserve the vault's diagnosis so
+            # the UI can still prompt a reconnect without crying outage.
+            merged[platform] = {
+                **env_entry,
+                "source": "env",
+                "vault_state": {
+                    "account": entry.get("account"),
+                    "needs_reconnect": entry.get("needs_reconnect"),
+                    "expires_in_days": entry.get("expires_in_days"),
+                    "error": entry.get("error"),
+                },
+            }
+            continue
         merged[platform] = entry
 
     # Pinterest exists only in the vault (no .env-era client), so it would be

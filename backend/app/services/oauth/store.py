@@ -104,6 +104,16 @@ async def get_access_token(db: AsyncSession, platform: str) -> Optional[str]:
     row = await get_credential(db, platform)
     if not row or row.needs_reconnect:
         return None
+    # An EXPIRED token shadows working .env keys exactly the way a
+    # needs_reconnect row does (ZBG52ZY, 2026-08-27). The reconnect flag is
+    # only set once something has already failed against the API; a token that
+    # simply aged out is just as unusable, but nothing had marked it yet. X's
+    # wizard token expired and every health probe reported the whole rail dead
+    # while the OAuth 1.0a keys in .env were live the entire time. Treat
+    # expiry as non-usable so the caller falls back, which is why the fallback
+    # exists. Rows with no expires_at (non-expiring grants) are unaffected.
+    if row.expires_at is not None and row.expires_at <= int(time.time()):
+        return None
     try:
         return decrypt(row.access_token)
     except CredentialCryptoError:
