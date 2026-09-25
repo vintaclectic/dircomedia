@@ -37,6 +37,9 @@ from app.services.oauth.providers import (
     PROVIDERS, PLATFORM_ORDER, get_provider, credentials_for, app_configured,
 )
 from app.services.oauth import store
+from app.services.oauth.redirects import (
+    canonical_redirect_uri, redirect_uri_drift, route_mismatch,
+)
 
 router = APIRouter()
 public_router = APIRouter()
@@ -45,12 +48,15 @@ public_router = APIRouter()
 # registered in each developer app EXACTLY (scheme, host, path, no trailing
 # slash) — a mismatch is the single most common OAuth failure, so the wizard
 # shows this string with a copy button rather than making Vinta retype it.
+#
+# This used to build the path from the string literal "/api/v1/oauth/{platform}
+# /callback". That literal is how the 2026-09-25 defect hid: .env named a
+# DIFFERENT path (/oauth/reddit/callback, a 404) and nothing compared the two.
+# The path now comes from the live route table via oauth.redirects, so the value
+# shown in the UI, used by the script, and sent on token exchange cannot diverge
+# from what the app actually serves.
 def _redirect_uri(request: Request, platform: str) -> str:
-    from app.config import settings as cfg
-    base = (getattr(cfg, "oauth_redirect_base", "") or "").rstrip("/")
-    if not base:
-        base = str(request.base_url).rstrip("/")
-    return f"{base}/api/v1/oauth/{platform}/callback"
+    return canonical_redirect_uri(platform, request=request)
 
 
 # ── status ───────────────────────────────────────────────────────────────────
@@ -70,6 +76,10 @@ class PlatformStatusOut(BaseModel):
     redirect_uri: str
     developer_portal: str
     docs_url: str
+    # Non-null ONLY when configuration disagrees with the routes the app serves
+    # (see services/oauth/redirects.py). The UI renders this as a loud warning:
+    # a silent redirect-URI mismatch is what cost hours on 2026-09-25.
+    config_warning: Optional[str] = None
 
 
 EXPIRING_WINDOW_DAYS = 3
@@ -98,6 +108,9 @@ async def connection_status(request: Request, db: AsyncSession = Depends(get_db)
     """The health wall's single source of truth (Screen 1 + Screen 3)."""
     rows = {c.platform: c for c in await store.list_credentials(db)}
     now = int(time.time())
+    # A broken/ambiguous callback mount breaks EVERY platform, so it is reported
+    # on every rail rather than hidden on one.
+    mount_problem = route_mismatch()
     out = []
     for key in PLATFORM_ORDER:
         p = get_provider(key)
@@ -118,6 +131,7 @@ async def connection_status(request: Request, db: AsyncSession = Depends(get_db)
             redirect_uri=_redirect_uri(request, key),
             developer_portal=p.developer_portal,
             docs_url=p.docs_url,
+            config_warning=mount_problem or redirect_uri_drift(key, request=request),
         ))
     return out
 
@@ -134,12 +148,21 @@ class StartOut(BaseModel):
     authorize_url: str
     state: str
     expires_in: int
+    # Echoed back so the UI can show Vinta the EXACT string to register, and so
+    # any CLI/script consumes the same value the server will send on exchange.
+    redirect_uri: str
 
 
 @router.get("/{platform}/start", response_model=StartOut)
 async def oauth_start(platform: str, request: Request, db: AsyncSession = Depends(get_db)):
     if platform not in PROVIDERS:
         raise HTTPException(404, f"Unknown platform '{platform}'.")
+    # FAIL LOUDLY, not silently: if the callback route isn't mounted exactly once,
+    # the redirect URI is not well-defined and the provider will reject the
+    # exchange with an error that reads like bad credentials. Refuse up front.
+    mount_problem = route_mismatch()
+    if mount_problem:
+        raise HTTPException(500, mount_problem)
     if not crypto_available():
         raise HTTPException(503, "CREDENTIAL_ENCRYPTION_KEY is not configured; refusing to start a flow whose token could not be stored safely.")
     p = get_provider(platform)
@@ -164,6 +187,7 @@ async def oauth_start(platform: str, request: Request, db: AsyncSession = Depend
         ),
         state=state,
         expires_in=store.STATE_TTL_SECONDS,
+        redirect_uri=redirect_uri,
     )
 
 
@@ -240,7 +264,15 @@ async def oauth_callback(
             p, code=code, redirect_uri=st.redirect_uri, code_verifier=st.code_verifier,
         )
     except oauth_flow.OAuthError as e:
-        return _popup_close_page(False, platform, str(e))
+        # Name the real cause. A bare "HTTP 401" here sent Vinta hunting through
+        # Reddit's app-type settings on 2026-09-25 when the actual fault was a
+        # redirect-URI mismatch. Show the URI that was sent so the mismatch is
+        # visible instead of guessed at.
+        return _popup_close_page(
+            False, platform,
+            f"{e} — redirect_uri sent was '{st.redirect_uri}'. It must be "
+            f"registered byte-for-byte on the {p.label} app at {p.developer_portal}.",
+        )
     except Exception as e:
         return _popup_close_page(False, platform, f"Token exchange error: {e.__class__.__name__}")
 

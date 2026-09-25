@@ -15,6 +15,35 @@ from app.api.v1 import content, video, distribution, analytics, projects, settin
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # ── OAuth redirect-URI sanity check (2026-09-25) ──
+    # A redirect URI that names a path the app does not serve is invisible at
+    # runtime and surfaces only as a provider-side HTTP 401 that reads like bad
+    # credentials. It cost hours once; it now announces itself at boot.
+    try:
+        import logging
+        from app.services.oauth.redirects import (
+            route_mismatch, redirect_uri_drift, canonical_redirect_uri,
+        )
+        log = logging.getLogger("dircomedia.oauth")
+        problem = route_mismatch(app)
+        if problem:
+            log.error("OAUTH CALLBACK MOUNT PROBLEM: %s", problem)
+        for _platform in ("reddit",):
+            drift = redirect_uri_drift(_platform, app=app)
+            if drift:
+                log.warning("OAUTH REDIRECT DRIFT [%s]: %s", _platform, drift)
+            else:
+                log.info(
+                    "OAuth redirect URI [%s] = %s",
+                    _platform, canonical_redirect_uri(_platform, app=app),
+                )
+    except Exception as exc:  # never block boot on a diagnostic
+        import logging
+        logging.getLogger("dircomedia.oauth").warning(
+            "OAuth redirect check skipped: %s", exc.__class__.__name__
+        )
+
     yield
 
 
