@@ -56,6 +56,7 @@ def _client_id(platform: str) -> str:
         "instagram": settings.instagram_app_id,
         "tiktok": settings.tiktok_client_key,
         "pinterest": getattr(settings, "pinterest_app_id", ""),
+        "youtube": settings.youtube_client_id,
     }.get(platform, "")
 
 
@@ -66,6 +67,7 @@ def _client_secret(platform: str) -> str:
         "instagram": settings.instagram_app_secret,
         "tiktok": settings.tiktok_client_secret,
         "pinterest": getattr(settings, "pinterest_app_secret", ""),
+        "youtube": settings.youtube_client_secret,
     }.get(platform, "")
 
 
@@ -159,11 +161,40 @@ PROVIDERS: dict[str, OAuthProvider] = {
         docs_url="https://developers.pinterest.com/docs/getting-started/authentication/",
         developer_portal="https://developers.pinterest.com/apps/",
     ),
+    "youtube": OAuthProvider(
+        key="youtube",
+        label="YouTube",
+        authorize_url="https://accounts.google.com/o/oauth2/v2/auth",
+        token_url="https://oauth2.googleapis.com/token",
+        # upload = videos.insert (the whole point); force-ssl = thumbnails.set
+        # and post-upload metadata edits. Same pair scripts/youtube_auth.py mints.
+        scopes=[
+            "https://www.googleapis.com/auth/youtube.upload",
+            "https://www.googleapis.com/auth/youtube.force-ssl",
+        ],
+        mode="oneclick",
+        client_auth="body",
+        # channels.list?mine=true answers "which channel did he pick" — Google
+        # accounts can own several, and uploading to the wrong one is silent.
+        identity_url="https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
+        identity_id_path=["items", "0", "id"],
+        identity_name_path=["items", "0", "snippet", "title"],
+        # access_type=offline is the ONLY way Google returns a refresh token, and
+        # prompt=consent forces it on a RE-connect too — without it Google skips
+        # the refresh token for an already-granted app and the rail dies in 1h.
+        extra_authorize_params={
+            "access_type": "offline",
+            "prompt": "consent",
+            "include_granted_scopes": "true",
+        },
+        docs_url="https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps",
+        developer_portal="https://console.cloud.google.com/apis/credentials",
+    ),
 }
 
 # The canonical order the UI renders in. Frontend imports this order from the
 # API rather than hardcoding it, so the two can never disagree.
-PLATFORM_ORDER = ["twitter", "reddit", "pinterest", "instagram", "tiktok"]
+PLATFORM_ORDER = ["twitter", "reddit", "youtube", "pinterest", "instagram", "tiktok"]
 
 
 def get_provider(platform: str) -> OAuthProvider:

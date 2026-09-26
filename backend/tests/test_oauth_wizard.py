@@ -111,10 +111,10 @@ def test_needs_reconnect_outranks_a_valid_expiry():
 
 # ── provider registry contract ───────────────────────────────────────────────
 
-def test_all_five_platforms_registered_and_ordered():
-    assert set(PROVIDERS) == {"twitter", "reddit", "instagram", "tiktok", "pinterest"}
+def test_all_six_platforms_registered_and_ordered():
+    assert set(PROVIDERS) == {"twitter", "reddit", "instagram", "tiktok", "pinterest", "youtube"}
     assert set(PLATFORM_ORDER) == set(PROVIDERS)
-    assert len(PLATFORM_ORDER) == 5
+    assert len(PLATFORM_ORDER) == 6
 
 
 def test_every_provider_declares_a_complete_spec():
@@ -131,6 +131,41 @@ def test_reddit_requests_permanent_duration():
     # Without duration=permanent Reddit returns no refresh token and the
     # connection silently dies in one hour, forever.
     assert PROVIDERS["reddit"].extra_authorize_params.get("duration") == "permanent"
+
+
+def test_youtube_requests_offline_refresh_token():
+    # access_type=offline is the only way Google returns a refresh token;
+    # prompt=consent forces one on a re-connect of an already-granted app.
+    p = PROVIDERS["youtube"]
+    assert p.mode == "oneclick"
+    assert p.extra_authorize_params.get("access_type") == "offline"
+    assert p.extra_authorize_params.get("prompt") == "consent"
+    assert "https://www.googleapis.com/auth/youtube.upload" in p.scopes
+    assert "https://www.googleapis.com/auth/youtube.force-ssl" in p.scopes
+
+
+def test_youtube_authorize_url_is_google_offline():
+    from urllib.parse import urlparse, parse_qs
+    url = oauth_flow.build_authorize_url(
+        get_provider("youtube"), client_id="CID", redirect_uri="https://x.test/cb",
+        state="S",
+    )
+    u = urlparse(url)
+    q = parse_qs(u.query)
+    assert u.netloc == "accounts.google.com"
+    assert q["access_type"] == ["offline"]
+    assert q["prompt"] == ["consent"]
+    assert q["client_id"] == ["CID"]
+    assert "youtube.upload" in q["scope"][0]
+
+
+def test_identity_dig_indexes_lists():
+    # channels.list nests the channel under items[0].
+    body = {"items": [{"id": "UC123", "snippet": {"title": "DirCo"}}]}
+    p = get_provider("youtube")
+    assert oauth_flow._dig(body, p.identity_id_path) == "UC123"
+    assert oauth_flow._dig(body, p.identity_name_path) == "DirCo"
+    assert oauth_flow._dig({"items": []}, p.identity_id_path) is None
 
 
 def test_twitter_requests_offline_access():

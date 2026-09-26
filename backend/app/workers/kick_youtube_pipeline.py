@@ -59,7 +59,7 @@ async def _poll_and_upload_async():
         }
 
     kick = KickClient(kick_username)
-    youtube = YouTubeClient()
+    youtube = await YouTubeClient.from_vault()
     twitter = TwitterClient()
 
     # Check if YouTube is configured (required)

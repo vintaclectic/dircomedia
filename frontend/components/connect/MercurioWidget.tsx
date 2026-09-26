@@ -117,6 +117,28 @@ const PER_PLATFORM: Record<ConnectPlatform, QA[]> = {
       keys: ["ban", "shadowban", "spam", "safe", "auto", "promo", "rule"],
     },
   ],
+  youtube: [
+    {
+      q: "Where do I get YouTube client credentials?",
+      a: "console.cloud.google.com → APIs & Services. Enable YouTube Data API v3 first, set up the OAuth consent screen, then Credentials → Create credentials → OAuth client ID with type 'Web application'. Add the redirect URI from this page under Authorized redirect URIs. The client ID and secret appear in the dialog once you save.",
+      keys: ["where", "credential", "client", "id", "secret", "get", "find", "google", "cloud"],
+    },
+    {
+      q: "Google says redirect_uri_mismatch.",
+      a: "The redirect URI on this page isn't registered on the OAuth client you're using — or the client is a Desktop app, which only allows loopback addresses. Open the client in Google Cloud → Credentials, make sure its type is 'Web application', and paste the exact redirect URI from this page into Authorized redirect URIs. Changes can take a few minutes to propagate.",
+      keys: ["redirect", "mismatch", "uri", "error", "400", "invalid", "desktop"],
+    },
+    {
+      q: "My YouTube connection died after a week.",
+      a: "That's Google's Testing-mode rule: while the OAuth consent screen is in Testing, refresh tokens are revoked after 7 days. Publish the consent screen (OAuth consent screen → Publish app) and reconnect once — after that the refresh token lives until you revoke it, and DirCoMedia renews the hourly access token by itself.",
+      keys: ["week", "7", "seven", "expire", "died", "invalid_grant", "testing", "revoked"],
+    },
+    {
+      q: "Which channel will DirCoMedia upload to?",
+      a: "Whichever one you pick in Google's account chooser during Authorize. A Google account can own several channels, so choose deliberately — the connected channel's name shows on the card afterwards. To switch channels, disconnect and authorize again with the other one.",
+      keys: ["channel", "which", "brand", "account", "switch", "upload"],
+    },
+  ],
   pinterest: [
     {
       q: "Where do I get Pinterest app credentials?",

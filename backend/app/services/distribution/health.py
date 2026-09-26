@@ -143,11 +143,18 @@ async def tiktok_health() -> dict:
     return {"configured": configured, "live": None}  # no cheap probe
 
 
+async def _youtube_health() -> dict:
+    """Probe with the wizard's vault token when present, else .env."""
+    from app.services.distribution.platforms.youtube import YouTubeClient
+
+    client = await YouTubeClient.from_vault()
+    return {**await client.health(), "credential_source": client.credential_source}
+
+
 async def check_all() -> dict[str, dict]:
     """Probe every platform + storage in parallel. Never raises."""
     from app.services.distribution.platforms.discord import DiscordClient
     from app.services.distribution.platforms.telegram import TelegramClient
-    from app.services.distribution.platforms.youtube import YouTubeClient
     from app.services.distribution.platforms.bluesky import BlueskyClient
     from app.services.storage import r2 as r2_storage
 
@@ -162,7 +169,7 @@ async def check_all() -> dict[str, dict]:
         tiktok_health(),
         DiscordClient().health(),
         TelegramClient().health(),
-        YouTubeClient().health(),
+        _youtube_health(),
         BlueskyClient().health(),
         r2_storage.health(),
         return_exceptions=True,

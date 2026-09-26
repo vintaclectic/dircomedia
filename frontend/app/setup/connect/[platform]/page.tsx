@@ -123,7 +123,7 @@ export default function PlatformSetupPage() {
       <div style={{ padding: "40px 18px", maxWidth: 640, margin: "0 auto" }}>
         <h1 style={{ fontSize: 22, color: "#f5f5f7", margin: "0 0 12px" }}>Unknown platform</h1>
         <p style={{ color: "#8a8a98", fontSize: 14, margin: "0 0 20px" }}>
-          &ldquo;{String(params.platform)}&rdquo; isn&apos;t one of the five connectable platforms.
+          &ldquo;{String(params.platform)}&rdquo; isn&apos;t one of the connectable platforms.
         </p>
         <Link href="/setup/connect" style={{ display: "inline-flex" }}>
           <SecondaryButton>Back to platforms</SecondaryButton>

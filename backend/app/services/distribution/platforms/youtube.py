@@ -50,10 +50,32 @@ DEFAULT_CATEGORY = "20"
 
 
 class YouTubeClient:
-    def __init__(self):
+    def __init__(self, refresh_token: Optional[str] = None):
         self.client_id = settings.youtube_client_id
         self.client_secret = settings.youtube_client_secret
-        self.refresh_token = settings.youtube_refresh_token
+        # A vault token (from the OAuth wizard) wins over .env; see from_vault.
+        self.credential_source = "oauth_wizard" if refresh_token else "env"
+        self.refresh_token = refresh_token or settings.youtube_refresh_token
+
+    @classmethod
+    async def from_vault(cls) -> "YouTubeClient":
+        """Build a client from the wizard's stored refresh token, falling back
+        to YOUTUBE_REFRESH_TOKEN in .env (scripts/youtube_auth.py).
+
+        Never raises: an empty or unreadable vault degrades to the .env client,
+        which is exactly the pre-wizard behaviour.
+        """
+        try:
+            from app.database import AsyncSessionLocal
+            from app.services.oauth import store
+
+            async with AsyncSessionLocal() as db:
+                token = await store.get_refresh_token(db, "youtube")
+            if token:
+                return cls(refresh_token=token)
+        except Exception:
+            pass
+        return cls()
 
     @property
     def configured(self) -> bool:

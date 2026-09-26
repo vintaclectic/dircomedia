@@ -313,6 +313,7 @@ ENV_KEYS = {
     "instagram": ("INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET"),
     "tiktok": ("TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"),
     "pinterest": ("PINTEREST_APP_ID", "PINTEREST_APP_SECRET"),
+    "youtube": ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET"),
 }
 
 
@@ -339,6 +340,7 @@ async def save_app_credentials(platform: str, body: ManualAppIn):
         "instagram": ("instagram_app_id", "instagram_app_secret"),
         "tiktok": ("tiktok_client_key", "tiktok_client_secret"),
         "pinterest": ("pinterest_app_id", "pinterest_app_secret"),
+        "youtube": ("youtube_client_id", "youtube_client_secret"),
     }[platform]
     setattr(cfg, attr_map[0], cid)
     setattr(cfg, attr_map[1], csec)

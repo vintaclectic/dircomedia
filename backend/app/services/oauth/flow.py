@@ -171,6 +171,12 @@ async def refresh_token(provider: OAuthProvider, *, refresh: str) -> dict[str, A
 def _dig(obj: Any, path: list[str]) -> Optional[str]:
     cur = obj
     for key in path:
+        # Numeric segments index into lists (Google's channels.list nests the
+        # channel under items[0]); everything else is a dict key.
+        if isinstance(cur, list) and key.isdigit():
+            idx = int(key)
+            cur = cur[idx] if idx < len(cur) else None
+            continue
         if not isinstance(cur, dict):
             return None
         cur = cur.get(key)

@@ -10,7 +10,7 @@
 import type { ConnectPlatform, ConnectionStatus } from "@/lib/types";
 
 export const PLATFORM_ORDER: ConnectPlatform[] = [
-  "twitter", "reddit", "pinterest", "instagram", "tiktok",
+  "twitter", "reddit", "youtube", "pinterest", "instagram", "tiktok",
 ];
 
 export interface PlatformMeta {
@@ -80,6 +80,32 @@ export const PLATFORM_META: Record<ConnectPlatform, PlatformMeta> = {
       },
     ],
   },
+  youtube: {
+    label: "YouTube",
+    color: "#FF0000",
+    glyph: "Y",
+    blurb: "Long-form and Shorts uploads, auto-fed from Kick streams. Refreshes itself forever once connected.",
+    steps: [
+      {
+        title: "Open Google Cloud credentials",
+        detail: "Create (or pick) a project named DirCoMedia, then APIs & Services → Library → enable YouTube Data API v3.",
+        link: "https://console.cloud.google.com/apis/credentials",
+        linkLabel: "console.cloud.google.com",
+      },
+      {
+        title: "Configure the OAuth consent screen",
+        detail: "External user type. Add the youtube.upload and youtube.force-ssl scopes and add your own Google account as a test user. Publish the app when you can — in Testing mode Google kills refresh tokens every 7 days.",
+      },
+      {
+        title: "Create a Web application OAuth client",
+        detail: "Credentials → Create credentials → OAuth client ID → type 'Web application' (a Desktop client cannot use this redirect). Paste the redirect URI below into Authorized redirect URIs.",
+      },
+      {
+        title: "Copy the client ID and secret",
+        detail: "Paste both below, then use Authorize and pick the channel that should upload. If scripts/youtube_auth.py already put them in .env, this step shows as saved.",
+      },
+    ],
+  },
   pinterest: {
     label: "Pinterest",
     color: "#E60023",
@@ -98,7 +124,7 @@ export const PLATFORM_META: Record<ConnectPlatform, PlatformMeta> = {
       },
       {
         title: "Copy the App ID and App Secret",
-        detail: "Paste both below, then use Authorize. Pinterest's OAuth flow is the least fussy of the five.",
+        detail: "Paste both below, then use Authorize. Pinterest's OAuth flow is the least fussy of the lot.",
       },
     ],
   },

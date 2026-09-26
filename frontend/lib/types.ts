@@ -15,7 +15,7 @@ export type Platform = "twitter" | "tiktok" | "instagram" | "reddit" | "pinteres
 
 /** Platform keys the wizard manages, in canonical render order. */
 export type ConnectPlatform =
-  | "twitter" | "reddit" | "pinterest" | "instagram" | "tiktok";
+  | "twitter" | "reddit" | "youtube" | "pinterest" | "instagram" | "tiktok";
 
 /**
  * connected       — healthy, >3d of life left (or never expires)

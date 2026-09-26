@@ -47,6 +47,8 @@ class DistributionScheduler:
         # Falls back to the .env client on any failure.
         if "twitter" in platforms:
             self.twitter = await TwitterClient.from_vault()
+        if "youtube" in platforms:
+            self.youtube = await YouTubeClient.from_vault()
 
         for platform in platforms:
             try:

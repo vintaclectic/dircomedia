@@ -2,7 +2,7 @@
 /**
  * SCREEN 1 — Platform picker (/setup/connect). YH9AE4D.
  *
- * The wall of five. Every card is a grid cell with its own space; the grid uses
+ * The wall of platforms. Every card is a grid cell with its own space; the grid uses
  * auto-fit/minmax so it goes 1-up at 375px and multi-column on desktop WITHOUT
  * a single media query — the browser reflows the tracks, so no breakpoint can
  * be missed and no two cards can ever share pixels.
