@@ -15,7 +15,9 @@ PREREQUISITE (one time, ~2 minutes — docs/PLATFORM_CONNECTIONS.md §5):
        **PUBLISH APP** on the consent screen to get a permanent token. The
        "unverified app" warning is irrelevant — you are the only user who will
        ever consent, and you just click "Advanced → Go to dircomedia".
-  4. Credentials → Create OAuth client ID → **Desktop app** → copy the
+  4. Credentials → Create OAuth client ID → **Desktop app** (it MUST be
+     Desktop — a "Web application" client would demand the redirect URI be
+     pre-registered; Desktop clients accept any loopback port) → copy the
      client ID + secret into backend/.env as:
          YOUTUBE_CLIENT_ID=...
          YOUTUBE_CLIENT_SECRET=...
@@ -40,7 +42,17 @@ import httpx
 
 ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 PORT = 8731  # uncommon port — avoids colliding with the API on 8000
-REDIRECT_URI = f"http://localhost:{PORT}/oauth/youtube/callback"
+# 127.0.0.1, NOT "localhost" (task PWWTDDX, verified 2026-09-26):
+#  - Google's native-app guide (updated 2026-09-14) names http://127.0.0.1:port
+#    and http://[::1]:port as the loopback formats and only tolerates
+#    "localhost" with a firewall caveat. Desktop-app clients need no port/path
+#    registration, so any fixed PORT + path is accepted.
+#  - On this WSL2 box (NAT mode, localhostForwarding) the Windows browser that
+#    receives the redirect reaches this 127.0.0.1 listener: measured from
+#    Windows curl.exe → 127.0.0.1:8731 = 200, code captured. [::1]:8731 =
+#    connection refused, so "localhost" only worked via IPv4 fallback.
+#    The literal removes that dependency. Bind address and URI must match.
+REDIRECT_URI = f"http://127.0.0.1:{PORT}/oauth/youtube/callback"
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SCOPES = (
