@@ -43,7 +43,14 @@ class Settings(BaseSettings):
     reddit_password: str = ""          # legacy; Google-login accounts have none — use refresh token
     reddit_refresh_token: str = ""     # preferred: 3-legged OAuth (no password ever). Mint via scripts/reddit_oauth.py
     reddit_user_agent: str = "web:com.dirco.media:v1.0 (by /u/dircomedia)"
-    reddit_redirect_uri: str = "http://localhost:8000/oauth/reddit/callback"
+    # DESCRIPTIVE ONLY — never authoritative. The real redirect URI is derived
+    # from the live route table by app.services.oauth.redirects.canonical_redirect_uri
+    # (which yields /api/v1/oauth/reddit/callback). Default is EMPTY on purpose: a
+    # non-empty default here used to be the old wrong path "/oauth/reddit/callback",
+    # which made redirect_uri_drift() fire a false "config drift" warning on the
+    # dashboard even when .env set nothing. Empty => the drift guard only fires when
+    # .env ACTUALLY carries a wrong REDDIT_REDIRECT_URI. (ZBG52ZY, 2026-10-05)
+    reddit_redirect_uri: str = ""
     # ACCOUNT-SAFETY GUARD (Vinta 2026-07-18, "approval-only"): Reddit shadowbans
     # accounts that auto-blast promos to subs they don't own. Reddit auto-fanout
     # is allowed ONLY to subreddits in this allowlist (comma-separated, no r/).
