@@ -40,3 +40,15 @@ Council review deliverables (Atlas architecture, sec10 security ruling, helios-1
 frontend reimagining, fusion broadcast contract, ARIA voice bibles, Lunex creative
 genome, frugal-max cost ruling) are recorded in the Work Journal and inform all
 future phases. Check the journal before restructuring anything.
+
+## Every stack needs its own self-healing guard — learned 2026-10-06, task TWXCVMS
+
+*DirCoMedia vanished from PM2 for the 3rd time (after YXCZ8ZM, ZBG52ZY). Measured cause: the 2026-10-02 06:53 reboot; `pm2 resurrect` restores from `~/.pm2/dump.pm2`, which lacked the dircomedia entries, and DirCoMedia was the ONLY major stack with no guard that re-creates its services. Meanwhile a dozen other watchdogs (vintinuum-keepalive, dirhaven-tunnel-guard, watchdog-daemon) run a bare `pm2 save` whenever THEIR service recovers — each one re-cemented the dump WITHOUT dircomedia, permanently.*
+
+**The lesson:** `dump.pm2` is NOT a source of truth — any `pm2 save` from any session overwrites it with whatever is running at that instant. A stack with no self-healing guard dies permanently the first time it falls out of PM2.
+
+**The rule:** every long-lived PM2 stack must have a cron guard that (1) health-checks via REAL HTTP against its ports + verifies all its PM2 entries are online, (2) restores missing/stopped services from its `ecosystem.config.js` (the source of truth, not the dump), (3) runs `pm2 save` AFTER restore to re-cement the dump, (4) was tested against a DEAD target (kill the services, watch the guard bring them back). DirCoMedia's is `scripts/dircomedia-guard.sh`, wired `*/2 * * * *` + `@reboot`.
+
+**Example violation:** relying on `pm2 save` + `pm2 resurrect` alone to survive a reboot — one save during an outage erases the stack forever.
+
+**Example compliance:** `dircomedia-guard.sh` — proven 2026-10-06 by `pm2 delete`-ing all 7 services and watching the guard restore 7/7 online + 4 ports 200, with `dump.pm2` re-populated.
