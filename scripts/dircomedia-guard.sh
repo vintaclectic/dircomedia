@@ -137,8 +137,13 @@ done
 # RE-CEMENT the dump so a reboot (or another watchdog's save during a future
 # outage) can no longer lose dircomedia. This is the half that breaks the
 # recurring-regression loop.
-pm2 save >/dev/null 2>&1
-log "pm2 save issued — dircomedia re-cemented into dump.pm2"
+# 2026-10-18: through the shared guard — a bare save here, during a partial boot,
+# re-cemented dircomedia AND cemented the absence of everything else.
+if bash /home/vinta/vintinuum-api/scripts/pm2-safe-save.sh --reason "dircomedia-guard" >/dev/null 2>&1; then
+    log "pm2 save issued — dircomedia re-cemented into dump.pm2"
+else
+    log "pm2 save REFUSED by pm2-safe-save (live list lacks apps the dump has) — dump left intact"
+fi
 
 # ── Verify the repair actually worked; never claim success blindly ──
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
