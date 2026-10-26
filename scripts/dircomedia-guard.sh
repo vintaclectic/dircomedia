@@ -80,7 +80,7 @@ http_code() {
 
 # ── Is a PM2 process present AND online? ──
 pm2_online() {
-    pm2 jlist 2>/dev/null | node -e '
+    printf '%s' "$JL" | node -e '
         let d="";process.stdin.on("data",c=>d+=c);
         process.stdin.on("end",()=>{
             let want=process.argv[1];
@@ -95,6 +95,9 @@ pm2_online() {
 # Prints the first failing reason to stdout for the caller to log.
 all_healthy() {
     local svc code
+    # One bounded jlist per check (was one unbounded call per service — 7 hung
+    # clients per run when PM2 stalled). PILEUP-2026-10-26
+    JL=$(timeout 20 pm2 jlist 2>/dev/null)
     for svc in $SERVICES; do
         if ! pm2_online "$svc"; then
             echo "pm2 service '$svc' missing or not online"
@@ -112,6 +115,15 @@ all_healthy() {
     return 0
 }
 
+# ── PILEUP-2026-10-26: PM2 itself unresponsive? Then do NOTHING. ──
+# Restarting through a stalled/split daemon is what orphaned 198 celery
+# processes (17GB). A dead daemon is vintinuum-keepalive's job, not ours.
+if ! pgrep -f 'PM2 v[0-9.]*: God Daemon' >/dev/null || ! timeout 15 pm2 ping >/dev/null 2>&1; then
+    log "PM2 daemon absent/unresponsive — skipping (not restarting through a broken PM2)"
+    echo "pm2_unresponsive $(date +%s)" > "$STATE"
+    exit 0
+fi
+
 # ── Healthy? record and leave. ──
 REASON="$(all_healthy)" && { echo "ok $(date +%s)" > "$STATE"; exit 0; }
 
@@ -125,12 +137,15 @@ fi
 
 # ── Restore from the SOURCE OF TRUTH (handles deleted AND stopped) ──
 log "restoring dircomedia stack from ecosystem.config.js"
-pm2 start "$ECOSYSTEM" --update-env >/dev/null 2>&1
+# Reap celery orphaned by earlier restarts before adding new ones (PILEUP-2026-10-26).
+_orph=$(ps -eo pid=,ppid=,args= | awk '$2==1 && /celery -A app.workers.celery_app/ {print $1}')
+[ -n "$_orph" ] && { kill $_orph 2>/dev/null; log "reaped orphaned celery: $(echo $_orph | wc -w)"; }
+timeout 60 pm2 start "$ECOSYSTEM" --update-env >/dev/null 2>&1
 # Any service that existed-but-was-stopped/errored gets an explicit restart
 # ('pm2 start <ecosystem>' only (re)starts entries it does not see as online).
 for svc in $SERVICES; do
     if ! pm2_online "$svc"; then
-        pm2 restart "$svc" --update-env >/dev/null 2>&1
+        timeout 30 pm2 restart "$svc" --update-env >/dev/null 2>&1
     fi
 done
 

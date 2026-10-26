@@ -25,6 +25,15 @@
 # must never be scaled past a single instance.
 set -euo pipefail
 cd /home/vinta/dircomedia/backend
+# PILEUP-2026-10-26: guarantee a single celery beat. Reap any beat orphaned
+# to init by an earlier restart, then hold an exclusive lock that the python
+# process inherits through exec (PM2 signals python directly, so the lock dies
+# with it). A second beat cannot start while one is alive.
+for _p in $(ps -eo pid=,ppid=,args= | awk '$2==1 && /celery -A app.workers.celery_app beat/ {print $1}'); do
+  kill "$_p" 2>/dev/null || true
+done
+exec 7>/home/vinta/dircomedia/backend/.celery-beat.lock
+flock -w 15 7 || { echo "another celery beat holds the lock — refusing to start a duplicate" >&2; exit 1; }
 exec python3 -m celery -A app.workers.celery_app beat \
   --loglevel=info \
   --schedule=/home/vinta/dircomedia/backend/celerybeat-schedule
