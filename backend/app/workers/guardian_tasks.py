@@ -21,15 +21,24 @@ from app.workers.celery_app import celery_app
 ALERT_REMINDER_HOURS = 24
 
 
+
 def _run_async(coro):
     """Run a coroutine from a sync Celery task.
 
-    asyncio.get_event_loop() is deprecated in 3.10+ and RAISES in a thread with
-    no current loop (which is exactly where Celery's prefork/thread pools put
-    us). asyncio.run() creates and disposes its own loop, so the task works the
-    same on the first call and the thousandth.
+    asyncio.get_event_loop() RAISES on Python 3.12 in a thread with no current
+    loop, which is where Celery's prefork pool runs tasks: every approved
+    broadcast failed with "There is no current event loop in thread
+    'MainThread'" and sat at status=approved (68 rows, 2026-11-14). asyncio.run()
+    gives each task its own loop; the pooled async engine is disposed at the end
+    so no connection outlives the loop it was opened on.
     """
-    return asyncio.run(coro)
+    async def _wrapped():
+        from app.database import engine
+        try:
+            return await coro
+        finally:
+            await engine.dispose()
+    return asyncio.run(_wrapped())
 
 
 async def _alert_owner(text: str) -> bool:
@@ -116,7 +125,7 @@ def platform_health_check():
 
         return {p: h for p, h in results.items()}
 
-    return asyncio.get_event_loop().run_until_complete(_run())
+    return _run_async(_run())
 
 
 @celery_app.task(name="app.workers.guardian_tasks.refresh_expiring_tokens")
@@ -186,4 +195,4 @@ def refresh_instagram_token():
         except Exception as e:
             return {"error": str(e)}
 
-    return asyncio.get_event_loop().run_until_complete(_run())
+    return _run_async(_run())

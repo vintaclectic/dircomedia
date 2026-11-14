@@ -11,6 +11,25 @@ import asyncio
 from app.workers.celery_app import celery_app
 
 
+def _run_async(coro):
+    """Run a coroutine from a sync Celery task.
+
+    asyncio.get_event_loop() RAISES on Python 3.12 in a thread with no current
+    loop, which is where Celery's prefork pool runs tasks: every approved
+    broadcast failed with "There is no current event loop in thread
+    'MainThread'" and sat at status=approved (68 rows, 2026-11-14). asyncio.run()
+    gives each task its own loop; the pooled async engine is disposed at the end
+    so no connection outlives the loop it was opened on.
+    """
+    async def _wrapped():
+        from app.database import engine
+        try:
+            return await coro
+        finally:
+            await engine.dispose()
+    return asyncio.run(_wrapped())
+
+
 @celery_app.task(bind=True, name="app.workers.broadcast_tasks.broadcast_fanout", max_retries=2)
 def broadcast_fanout_task(self, broadcast_id: str):
     async def _run():
@@ -29,6 +48,12 @@ def broadcast_fanout_task(self, broadcast_id: str):
             broadcast = result.scalar_one_or_none()
             if not broadcast:
                 return {"error": "Broadcast not found"}
+
+            # Idempotent fan-out: only an APPROVED row posts. A redelivered or
+            # duplicate task (celery retry ETA held across a worker restart, a
+            # manual re-dispatch) must never post the same copy twice.
+            if broadcast.status != BroadcastStatus.approved:
+                return {"skipped": broadcast.status.value}
 
             # Hard gate even at the worker: the kill switch stops in-flight work.
             if settings.broadcast_kill_switch:
@@ -112,6 +137,6 @@ def broadcast_fanout_task(self, broadcast_id: str):
             return {"status": broadcast.status.value, "results": results}
 
     try:
-        return asyncio.get_event_loop().run_until_complete(_run())
+        return _run_async(_run())
     except Exception as exc:
         raise self.retry(exc=exc, countdown=120)

@@ -2,6 +2,25 @@ import asyncio
 from app.workers.celery_app import celery_app
 
 
+def _run_async(coro):
+    """Run a coroutine from a sync Celery task.
+
+    asyncio.get_event_loop() RAISES on Python 3.12 in a thread with no current
+    loop, which is where Celery's prefork pool runs tasks: every approved
+    broadcast failed with "There is no current event loop in thread
+    'MainThread'" and sat at status=approved (68 rows, 2026-11-14). asyncio.run()
+    gives each task its own loop; the pooled async engine is disposed at the end
+    so no connection outlives the loop it was opened on.
+    """
+    async def _wrapped():
+        from app.database import engine
+        try:
+            return await coro
+        finally:
+            await engine.dispose()
+    return asyncio.run(_wrapped())
+
+
 @celery_app.task(bind=True, name="app.workers.distribution_tasks.post_now", max_retries=3)
 def post_now_task(self, content_id: str, platforms: list[str]):
     async def _run():
@@ -52,7 +71,7 @@ def post_now_task(self, content_id: str, platforms: list[str]):
         return results
 
     try:
-        return asyncio.get_event_loop().run_until_complete(_run())
+        return _run_async(_run())
     except Exception as exc:
         raise self.retry(exc=exc, countdown=60)
 
@@ -86,4 +105,4 @@ def process_due_schedules():
                 post_now_task.delay(str(schedule.content_id), schedule.platforms)
             return {"processed": len(due)}
 
-    return asyncio.get_event_loop().run_until_complete(_run())
+    return _run_async(_run())
