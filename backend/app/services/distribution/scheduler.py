@@ -146,16 +146,32 @@ class DistributionScheduler:
     async def _post_reddit(
         self, text: str, media_url: Optional[str], project_slug: str, subreddits: list[str]
     ) -> dict:
+        # ── FAIL CLOSED ON AN UNNAMED DESTINATION (task MWNMNT9, 2026-11-16) ──
+        # THE ACCOUNTS ARE THE ASSET (project law #3). This used to fall back to a
+        # hardcoded per-project table of LARGE THIRD-PARTY SUBREDDITS Vinta does
+        # not own and does not moderate:
+        #       vintinuum   -> ["artificial", "singularity"]
+        #       agentis     -> ["artificial", "MachineLearning"]
+        #       dirhaven-rp -> ["FiveM", "GrandTheftAutoV"]
+        #       (anything else) -> ["test"]
+        # MEASURED 2026-11-16: `Broadcast` has NO `reddit_subreddit` column, so
+        # broadcast_tasks.py's `getattr(broadcast, "reddit_subreddit", None)` was
+        # ALWAYS "" and it never passed `subreddits=` here. Net effect: setting
+        # REDDIT_AUTO_SUBREDDITS to an OWNED sub — the exact action that worker's
+        # own error message tells you to take — did not post to that sub. It
+        # opened this fallback and submitted to r/artificial + r/singularity from
+        # Vinta's `vintaclectic` account. That is the unsolicited-promo pattern
+        # Reddit bans accounts for, i.e. the fallback was the account risk.
+        #
+        # A destination is never guessed again. No explicit, owner-allowlisted
+        # subreddit => Reddit does not post at all. The caller must say where.
         if not subreddits:
-            # Default subreddits per project
-            defaults = {
-                "dirhaven-rp": ["FiveM", "GrandTheftAutoV"],
-                "dirmegle": ["SocialNetworking"],
-                "medaled": ["gaming"],
-                "agentis": ["artificial", "MachineLearning"],
-                "vintinuum": ["artificial", "singularity"],
+            return {
+                "error": "no subreddit named — refusing to guess a destination. "
+                "Set REDDIT_AUTO_SUBREDDITS to a subreddit you own/moderate "
+                "(it is the destination, not a feature flag), or pass "
+                "subreddits=[...] explicitly."
             }
-            subreddits = defaults.get(project_slug, ["test"])
 
         results = {}
         for sub in subreddits[:2]:  # Max 2 subreddits per post

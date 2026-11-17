@@ -74,12 +74,28 @@ def broadcast_fanout_task(self, broadcast_id: str):
             # auto path entirely; it posts only via an explicit owner approval flow.
             platforms = list(broadcast.platforms or [])
             reddit_skipped = False
+            reddit_targets: list[str] = []
             if "reddit" in platforms:
                 allow = [s.strip().lower() for s in (settings.reddit_auto_subreddits or "").split(",") if s.strip()]
+                # `Broadcast` carries no reddit_subreddit column today, so this is
+                # "" on every real row. It stays as the hook for a per-broadcast
+                # target, and such a target must still be ON the owned allowlist —
+                # approval can choose AMONG owned subs, never outside them.
                 target = (getattr(broadcast, "reddit_subreddit", None) or "").strip().lower()
                 if not allow or (target and target not in allow):
                     platforms = [p for p in platforms if p != "reddit"]
                     reddit_skipped = True
+                else:
+                    # ── THE DESTINATION IS THE ALLOWLIST (task MWNMNT9) ───────
+                    # REDDIT_AUTO_SUBREDDITS is documented in config.py as
+                    # "owned subs only" — it is a LIST OF PLACES TO POST, not a
+                    # boolean. Before this, it was read only for emptiness and
+                    # `subreddits=` was never passed, so the scheduler reached its
+                    # (now removed) hardcoded fallback and submitted to
+                    # r/artificial + r/singularity — subs Vinta does not own.
+                    # Forwarding it is what makes "set an owned sub to enable
+                    # auto-post" actually mean what it says.
+                    reddit_targets = [target] if target else allow
 
             scheduler = DistributionScheduler()
             results = await scheduler.post(
@@ -88,6 +104,9 @@ def broadcast_fanout_task(self, broadcast_id: str):
                 media_url=broadcast.media_url,
                 content_type=broadcast.content_type,
                 project_slug=broadcast.project_slug,
+                # Explicit, owner-allowlisted destination. Never omitted: the
+                # scheduler now refuses Reddit outright rather than guess a sub.
+                subreddits=reddit_targets,
                 # YouTube needs the title UNFLATTENED — `text` merges title and
                 # body for feed platforms, but the SEO engine wants the topic
                 # on its own to optimise the search phrase against.
