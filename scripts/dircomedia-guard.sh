@@ -61,9 +61,64 @@ export PATH="$PATH:/usr/local/bin:/usr/bin:/home/vinta/.nvm/versions/node/$(ls -
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 
-# Single-instance: never let two guards race to spawn the stack.
-exec 9>"$LOCK" || exit 0
-flock -n 9 || exit 0
+# == Single-instance, but NEVER silently forever (MWNMNT9, 2026-11-18) ==
+# MEASURED 2026-11-18 00:4x: the lock file's mtime was 2026-11-18 00:08 (so
+# `exec 9>"$LOCK"` HAD run that tick) while this guard's log's last line was
+# 2026-11-16 06:51:26 -- and every code path below this block calls log().
+# Enumerated, the only exits above the first log() were these two lines, so
+# the guard had been exiting at `flock -n` for ~2 days while all seven
+# services sat `stopped` and :8000 answered 000 (control :8798 -> 200).
+# A silent `exit 0` on a busy lock converts ONE wedged holder into a
+# PERMANENT outage of the self-healing guard itself -- strictly worse than
+# having no guard, because `pm2 list` still shows the entries and nothing
+# anywhere says the watchdog stood down.
+# fd 9 is inherited by every child, and `pm2 start` spawns the God Daemon
+# detached, so a single long-lived descendant of an earlier run holds this
+# lock for its entire life. Three changes, each independently load-bearing:
+#   (1) spawn with `9>&-` so no child can ever inherit the lock again;
+#   (2) shout (rate-limited, never muted) whenever the lock is busy;
+#   (3) break a lock held longer than any real guard run can possibly take.
+STALE_LOCK_SECS=900   # guard worst case ~5.5 min: 4 curls@6s + 60s + 7x30s + 15x4s
+NAG_SECS=900          # throttle a REFUSAL; never silence it (5WM3QQX)
+
+BUSY_STAMP="${LOCK}.busy-since"
+NAG_STAMP="${LOCK}.nagged-at"
+
+_now() { date +%s; }
+# Age in seconds of the unix stamp in $1; -1 when absent/garbage.
+_age() {
+    local t
+    t=$(cat "$1" 2>/dev/null)
+    case "$t" in ''|*[!0-9]*) echo -1 ;; *) echo $(( $(_now) - t )) ;; esac
+}
+# log() at most once per NAG_SECS. A refusal may be throttled, never muted.
+nag() {
+    local age
+    age=$(_age "$NAG_STAMP")
+    if [ "$age" -lt 0 ] || [ "$age" -ge "$NAG_SECS" ]; then
+        log "$*"
+        _now > "$NAG_STAMP" 2>/dev/null || true
+    fi
+}
+
+exec 9>"$LOCK" || { log "FATAL: cannot open lock $LOCK -- guard cannot run"; exit 1; }
+
+if ! flock -n 9; then
+    [ -f "$BUSY_STAMP" ] || _now > "$BUSY_STAMP" 2>/dev/null || true
+    busy_for=$(_age "$BUSY_STAMP")
+    [ "$busy_for" -lt 0 ] && busy_for=0
+    if [ "$busy_for" -ge "$STALE_LOCK_SECS" ]; then
+        log "STALE LOCK -- $LOCK busy ${busy_for}s (> ${STALE_LOCK_SECS}s, longer than any real guard run); breaking it onto a fresh inode"
+        rm -f "$LOCK" "$BUSY_STAMP" 2>/dev/null || true
+        exec 9>"$LOCK" || { log "FATAL: cannot re-open lock after break"; exit 1; }
+        flock -n 9 || { log "FATAL: lock still busy immediately after break -- standing down"; exit 1; }
+        log "stale lock broken -- proceeding with the health check"
+    else
+        nag "lock busy ${busy_for}s (an earlier guard run or one of its children holds $LOCK) -- skipping this tick; breaking it at ${STALE_LOCK_SECS}s"
+        exit 0
+    fi
+fi
+rm -f "$BUSY_STAMP" 2>/dev/null || true
 
 # Rotate our own log so this never becomes the next disk problem.
 if [ -f "$LOG" ] && [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt "$MAX_LOG_BYTES" ]; then
@@ -88,7 +143,7 @@ pm2_online() {
                 let p=a.find(x=>x.name===want);
                 process.exit(p && p.pm2_env && p.pm2_env.status==="online" ? 0 : 1);
             }catch(e){process.exit(1);}
-        });' "$1"
+        });' "$1" 9>&-
 }
 
 # ── THE REAL HEALTH CHECK ── returns 0 only if EVERYTHING is healthy.
@@ -97,7 +152,7 @@ all_healthy() {
     local svc code
     # One bounded jlist per check (was one unbounded call per service — 7 hung
     # clients per run when PM2 stalled). PILEUP-2026-10-26
-    JL=$(timeout 20 pm2 jlist 2>/dev/null)
+    JL=$(timeout 20 pm2 jlist 2>/dev/null 9>&-)
     for svc in $SERVICES; do
         if ! pm2_online "$svc"; then
             echo "pm2 service '$svc' missing or not online"
@@ -118,8 +173,8 @@ all_healthy() {
 # ── PILEUP-2026-10-26: PM2 itself unresponsive? Then do NOTHING. ──
 # Restarting through a stalled/split daemon is what orphaned 198 celery
 # processes (17GB). A dead daemon is vintinuum-keepalive's job, not ours.
-if ! pgrep -f 'PM2 v[0-9.]*: God Daemon' >/dev/null || ! timeout 15 pm2 ping >/dev/null 2>&1; then
-    log "PM2 daemon absent/unresponsive — skipping (not restarting through a broken PM2)"
+if ! pgrep -f 'PM2 v[0-9.]*: God Daemon' >/dev/null || ! timeout 15 pm2 ping >/dev/null 2>&1 9>&-; then
+    nag "PM2 daemon absent/unresponsive — skipping (not restarting through a broken PM2)"
     echo "pm2_unresponsive $(date +%s)" > "$STATE"
     exit 0
 fi
@@ -140,12 +195,12 @@ log "restoring dircomedia stack from ecosystem.config.js"
 # Reap celery orphaned by earlier restarts before adding new ones (PILEUP-2026-10-26).
 _orph=$(ps -eo pid=,ppid=,args= | awk '$2==1 && /celery -A app.workers.celery_app/ {print $1}')
 [ -n "$_orph" ] && { kill $_orph 2>/dev/null; log "reaped orphaned celery: $(echo $_orph | wc -w)"; }
-timeout 60 pm2 start "$ECOSYSTEM" --update-env >/dev/null 2>&1
+timeout 60 pm2 start "$ECOSYSTEM" --update-env >/dev/null 2>&1 9>&-
 # Any service that existed-but-was-stopped/errored gets an explicit restart
 # ('pm2 start <ecosystem>' only (re)starts entries it does not see as online).
 for svc in $SERVICES; do
     if ! pm2_online "$svc"; then
-        timeout 30 pm2 restart "$svc" --update-env >/dev/null 2>&1
+        timeout 30 pm2 restart "$svc" --update-env >/dev/null 2>&1 9>&-
     fi
 done
 
@@ -154,7 +209,7 @@ done
 # recurring-regression loop.
 # 2026-10-18: through the shared guard — a bare save here, during a partial boot,
 # re-cemented dircomedia AND cemented the absence of everything else.
-if bash /home/vinta/vintinuum-api/scripts/pm2-safe-save.sh --reason "dircomedia-guard" >/dev/null 2>&1; then
+if bash /home/vinta/vintinuum-api/scripts/pm2-safe-save.sh --reason "dircomedia-guard" >/dev/null 2>&1 9>&-; then
     log "pm2 save issued — dircomedia re-cemented into dump.pm2"
 else
     log "pm2 save REFUSED by pm2-safe-save (live list lacks apps the dump has) — dump left intact"
